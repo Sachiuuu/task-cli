@@ -5,7 +5,7 @@
   "main": "index.js",
   "bin": {
     "task-cli": "./index.js",
-    "t": "./index.js"
+    "tsk": "./index.js"
   },
   "scripts": {
     "test": "vitest run"

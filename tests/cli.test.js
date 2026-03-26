@@ -129,6 +129,41 @@ describe("CLI integration", () => {
     expect(stderr).toContain("Nothing to undo");
   });
 
+  it("marks a done task back to todo", () => {
+    runCli(["add", "Task"]);
+    runCli(["done", "1"]);
+    const { stdout } = runCli(["todo", "1"]);
+    expect(stdout).toContain("marked as todo");
+  });
+
+  it("shows error when todo-ing an already-todo task", () => {
+    runCli(["add", "Task"]);
+    const { stderr } = runCli(["todo", "1"], true);
+    expect(stderr).toContain("already marked as todo");
+  });
+
+  it("adds a task with a due date visible in the list", () => {
+    runCli(["add", "Doctor visit", "--due", "december 31"]);
+    const { stdout } = runCli(["list"]);
+    expect(stdout).toContain("Doctor visit");
+    expect(stdout).toContain("Dec 31");
+  });
+
+  it("shows error for invalid due date", () => {
+    const { stderr } = runCli(["add", "Task", "--due", "feb 30"], true);
+    expect(stderr).toContain("Invalid date");
+  });
+
+  it("adds a task with a tag and groups it in the list", () => {
+    runCli(["add", "Fix bug", "--tag", "work"]);
+    runCli(["add", "Read chapter", "--tag", "school"]);
+    const { stdout } = runCli(["list"]);
+    expect(stdout).toContain("SCHOOL");
+    expect(stdout).toContain("WORK");
+    expect(stdout).toContain("Fix bug");
+    expect(stdout).toContain("Read chapter");
+  });
+
   it("handles full workflow: add, done, list, delete", () => {
     runCli(["add", "Step 1"]);
     runCli(["add", "Step 2"]);

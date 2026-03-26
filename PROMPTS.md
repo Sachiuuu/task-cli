@@ -81,4 +81,26 @@ This document logs all prompts used during the development of task-cli.
 
 ---
 
-**Prompts used: 3 / 20**
+## Prompt 4 (Binary rename, confirmations, stats emojis, aliases in help)
+
+**Prompt:**
+
+> el binario t no es identificado por la terminal, podriamos cambiarlo a ts o tsk, tambien en el help command haz un output de los aliases junto su version original. el screen clear esta bien pero al eliminar haz el clear despues de q el usuario confirme su eleccion. tambien agrega un mensaje de confirmacion al agregar un task, update task, done task, y undo action para q el usuario no tenga ninguna equivocacion. Los stats pueden tener un color y emojis para q sea mas informativo y el usuario este mejor informado.
+
+**What was done:**
+- Renamed binary alias from `t` to `tsk` in `package.json`
+- Added confirmation prompts for add, done, update, undo (delete already had one)
+- Moved `clearIfTTY()` to run AFTER user confirms in all commands with prompts
+- Updated stats bar with emojis (📝 Total, ✅ Completed, ⏳ Pending, 🎯 Rate)
+- Rate is color-coded: green (>=80%), yellow (>=50%), red (<50%), 🏆 at 100%
+- Help output shows `add|a`, `list|l` etc. inline + custom Aliases shortcuts section
+- Added `-y/--yes` flag to all commands with confirmations
+- All 55 tests still passing
+
+**Git commits produced:**
+13. `Rename binary alias from 't' to 'tsk' to avoid terminal conflicts`
+14. `Add confirmations, colored stats with emojis, aliases in help`
+
+---
+
+**Prompts used: 4 / 20**

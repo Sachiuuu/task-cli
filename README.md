@@ -88,19 +88,25 @@ All commands have short aliases for faster typing. You can also use `t` instead 
 
 | Full command      | Short alias |
 |---|---|
-| `task-cli add`    | `t a`       |
-| `task-cli list`   | `t l`       |
-| `task-cli done`   | `t d`       |
-| `task-cli delete` | `t del`     |
-| `task-cli update` | `t u`       |
-| `task-cli undo`   | `t undo`    |
+| `task-cli add`    | `tsk a`     |
+| `task-cli list`   | `tsk l`     |
+| `task-cli done`   | `tsk d`     |
+| `task-cli delete` | `tsk del`   |
+| `task-cli update` | `tsk u`     |
+| `task-cli undo`   | `tsk undo`  |
 
 Example:
 ```bash
-t a "Buy milk"
-t l
-t d 1
-t undo
+tsk a "Buy milk"
+tsk l
+tsk d 1
+tsk undo
+```
+
+All commands ask for confirmation before executing (except `list`). Use `-y` or `--yes` to skip:
+```bash
+tsk a "Buy milk" --yes
+tsk del 1 --yes
 ```
 
 ## Where is my data stored?

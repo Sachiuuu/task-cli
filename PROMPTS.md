@@ -125,4 +125,24 @@ This document logs all prompts used during the development of task-cli.
 
 ---
 
-**Prompts used: 5 / 20**
+## Prompt 6 (Per-tag ID tables, update-due, README update)
+
+**Prompt:**
+
+> Hay un problema al crear varios tags y agregar los task en diferente orden, por ejemplo si crea un task con el tag gym sera el id#1, despues decido agregar otro task con el tag work como id#2, al agregar otro task con el tag de gym, sera el id#3 haciendo q la tabla se vea rara ya q el id col esta en desorden. la manera de solucionar esto seria dividir los tags en diferentes tablas para asi los id esten en orden. Obviamente para eliminar tasks de ciertos tags habra q especificar para no eliminar un task de otro tag q tenga el mismo id. Tambien crea una funcion para hacer update el due date de cada task. Y porfavor actualiza el README.md y el help output para agregar los nuevos comandos que hemos agregado con su descripcion para q el usuario tenga un mejor entendimiento de la herramienta
+
+**What was done:**
+- Replaced global `nextId` with `tagCounters: {}` — each tag gets its own independent ID sequence starting at 1
+- `src/storage.js`: updated `getDefaultData()`, added `migrateFromNextId()` for backward compatibility with old data files
+- `src/task.js`: updated `saveUndoSnapshot()` to include `tagCounters`, rewrote `findTask(data, id, tag)` — tag-scoped lookup with multi-match error when same ID exists across tags, updated `addTask/markDone/markTodo/deleteTask/updateTask` to accept optional `tag` param, added `updateDueDate(data, id, newDueDate, tag)`, updated `undoAction()` to restore `tagCounters`
+- `index.js`: `renderList()` now renders a separate `Table` per tag (tag shown as section header above each table, no Tag column inside), added `--tag` option to `done/todo/delete/update/update-due` commands, added `update-due` command (alias `ud`), updated help aliases section
+- Updated all 3 test files — 95 tests passing
+- Full README.md rewrite with new commands, tag disambiguation docs, updated shortcuts table
+
+**Git commits produced:**
+18. `Replace global nextId with per-tag tagCounters for independent ID sequences`
+19. `Add update-due command, --tag option on all ID commands, separate tables per tag`
+
+---
+
+**Prompts used: 6 / 20**

@@ -154,7 +154,7 @@ describe("CLI integration", () => {
     expect(stderr).toContain("Invalid date");
   });
 
-  it("adds a task with a tag and groups it in the list", () => {
+  it("adds tasks with tags and shows each tag as a separate section header", () => {
     runCli(["add", "Fix bug", "--tag", "work"]);
     runCli(["add", "Read chapter", "--tag", "school"]);
     const { stdout } = runCli(["list"]);
@@ -162,6 +162,61 @@ describe("CLI integration", () => {
     expect(stdout).toContain("WORK");
     expect(stdout).toContain("Fix bug");
     expect(stdout).toContain("Read chapter");
+  });
+
+  it("assigns independent IDs per tag", () => {
+    runCli(["add", "Work task 1", "--tag", "work"]);
+    runCli(["add", "Gym task 1",  "--tag", "gym"]);
+    runCli(["add", "Work task 2", "--tag", "work"]);
+    const { stdout } = runCli(["list"]);
+    // Both tags should show IDs starting from 1
+    expect(stdout).toContain("Work task 1");
+    expect(stdout).toContain("Work task 2");
+    expect(stdout).toContain("Gym task 1");
+  });
+
+  it("requires --tag when same ID exists in multiple tags", () => {
+    runCli(["add", "Work task", "--tag", "work"]);
+    runCli(["add", "Gym task",  "--tag", "gym"]);
+    // Both are ID 1 in their respective tags
+    const { stderr } = runCli(["done", "1"], true);
+    expect(stderr).toContain("Multiple tasks");
+  });
+
+  it("marks done with --tag when same ID exists in multiple tags", () => {
+    runCli(["add", "Work task", "--tag", "work"]);
+    runCli(["add", "Gym task",  "--tag", "gym"]);
+    const { stdout } = runCli(["done", "1", "--tag", "work"]);
+    expect(stdout).toContain("marked as done");
+    expect(stdout).toContain("Work task");
+  });
+
+  it("deletes with --tag when same ID exists in multiple tags", () => {
+    runCli(["add", "Work task", "--tag", "work"]);
+    runCli(["add", "Gym task",  "--tag", "gym"]);
+    const { stdout } = runCli(["delete", "1", "--tag", "gym"]);
+    expect(stdout).toContain("deleted");
+    expect(stdout).toContain("Gym task");
+  });
+
+  it("updates due date with update-due command", () => {
+    runCli(["add", "Doctor visit"]);
+    const { stdout } = runCli(["update-due", "1", "december 25"]);
+    expect(stdout).toContain("due date updated");
+    expect(stdout).toContain("Dec 25");
+  });
+
+  it("shows error for invalid due date in update-due", () => {
+    runCli(["add", "Task"]);
+    const { stderr } = runCli(["update-due", "1", "feb 30"], true);
+    expect(stderr).toContain("Invalid date");
+  });
+
+  it("update-due requires --tag when same ID exists in multiple tags", () => {
+    runCli(["add", "Work task", "--tag", "work"]);
+    runCli(["add", "Gym task",  "--tag", "gym"]);
+    const { stderr } = runCli(["update-due", "1", "december 25"], true);
+    expect(stderr).toContain("Multiple tasks");
   });
 
   it("handles full workflow: add, done, list, delete", () => {

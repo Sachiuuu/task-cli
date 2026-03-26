@@ -1,9 +1,9 @@
-const { addTask, listTasks, markDone, markTodo, deleteTask, updateTask, undoAction, parseDueDate } = require("../src/task");
+const { addTask, listTasks, markDone, markTodo, deleteTask, updateTask, updateDueDate, undoAction, parseDueDate } = require("../src/task");
 
 let data;
 
 beforeEach(() => {
-  data = { nextId: 1, tasks: [], undo: null };
+  data = { tagCounters: {}, tasks: [], undo: null };
 });
 
 describe("addTask", () => {
@@ -19,17 +19,34 @@ describe("addTask", () => {
     expect(result.task.createdAt).toBeDefined();
     expect(result.task.updatedAt).toBeDefined();
     expect(data.tasks).toHaveLength(1);
-    expect(data.nextId).toBe(2);
+    expect(data.tagCounters[""]).toBe(2);
   });
 
   it("adds a task with a tag (lowercased)", () => {
     const result = addTask(data, "Fix bug", { tag: "Work" });
     expect(result.task.tag).toBe("work");
+    expect(result.task.id).toBe(1);
+    expect(data.tagCounters["work"]).toBe(2);
   });
 
   it("adds a task with a due date", () => {
     const result = addTask(data, "Doctor appointment", { dueDate: "2026-12-25" });
     expect(result.task.dueDate).toBe("2026-12-25");
+  });
+
+  it("assigns independent IDs per tag", () => {
+    addTask(data, "Work task 1", { tag: "work" });
+    addTask(data, "Gym task 1",  { tag: "gym" });
+    addTask(data, "Work task 2", { tag: "work" });
+    addTask(data, "Gym task 2",  { tag: "gym" });
+
+    const workTasks = data.tasks.filter((t) => t.tag === "work");
+    const gymTasks  = data.tasks.filter((t) => t.tag === "gym");
+
+    expect(workTasks.map((t) => t.id)).toEqual([1, 2]);
+    expect(gymTasks.map((t) => t.id)).toEqual([1, 2]);
+    expect(data.tagCounters["work"]).toBe(3);
+    expect(data.tagCounters["gym"]).toBe(3);
   });
 
   it("rejects empty tag", () => {
@@ -47,7 +64,7 @@ describe("addTask", () => {
     expect(result.task.title).toBe("Buy groceries");
   });
 
-  it("auto-increments IDs", () => {
+  it("auto-increments IDs within the same tag", () => {
     addTask(data, "Task 1");
     addTask(data, "Task 2");
     addTask(data, "Task 3");
@@ -55,7 +72,7 @@ describe("addTask", () => {
     expect(data.tasks[0].id).toBe(1);
     expect(data.tasks[1].id).toBe(2);
     expect(data.tasks[2].id).toBe(3);
-    expect(data.nextId).toBe(4);
+    expect(data.tagCounters[""]).toBe(4);
   });
 
   it("rejects empty title", () => {
@@ -87,14 +104,14 @@ describe("addTask", () => {
     expect(result.error).toContain("cannot be empty");
   });
 
-  it("renumbers IDs sequentially after deletion", () => {
+  it("renumbers IDs sequentially within the same tag after deletion", () => {
     addTask(data, "Task 1");
     addTask(data, "Task 2");
     addTask(data, "Task 3");
     deleteTask(data, 2);
 
     expect(data.tasks.map((t) => t.id)).toEqual([1, 2]);
-    expect(data.nextId).toBe(3);
+    expect(data.tagCounters[""]).toBe(3);
   });
 });
 
@@ -128,7 +145,7 @@ describe("listTasks", () => {
   });
 
   it("returns empty array when no tasks match filter", () => {
-    const emptyData = { nextId: 1, tasks: [] };
+    const emptyData = { tagCounters: {}, tasks: [] };
     const result = listTasks(emptyData, "todo");
     expect(result.tasks).toHaveLength(0);
   });
@@ -146,8 +163,6 @@ describe("markDone", () => {
   });
 
   it("updates the updatedAt timestamp", () => {
-    const before = data.tasks[0].updatedAt;
-    // Small delay to ensure different timestamp
     const result = markDone(data, 1);
     expect(result.task.updatedAt).toBeDefined();
   });
@@ -177,6 +192,21 @@ describe("markDone", () => {
     const result = markDone(data, 0);
     expect(result.error).toContain("not a valid task ID");
   });
+
+  it("finds task by tag when ID exists in multiple tags", () => {
+    addTask(data, "Work task", { tag: "work" });
+    // ID 1 now exists in both "" (untagged) and "work"
+    const result = markDone(data, 1, "work");
+    expect(result.task.tag).toBe("work");
+    expect(result.task.status).toBe("done");
+  });
+
+  it("returns error when ID is ambiguous across tags without --tag", () => {
+    addTask(data, "Work task", { tag: "work" });
+    // ID 1 exists in both "" and "work"
+    const result = markDone(data, 1);
+    expect(result.error).toContain("Multiple tasks");
+  });
 });
 
 describe("deleteTask", () => {
@@ -190,12 +220,28 @@ describe("deleteTask", () => {
     expect(result.task.title).toBe("Task to delete");
     expect(data.tasks).toHaveLength(1);
     expect(data.tasks[0].id).toBe(1);
-    expect(data.nextId).toBe(2);
+    expect(data.tagCounters[""]).toBe(2);
   });
 
   it("returns error for non-existent ID", () => {
     const result = deleteTask(data, 999);
     expect(result.error).toContain("No task found");
+  });
+
+  it("renumbers only within the same tag, not across tags", () => {
+    addTask(data, "Work task 1", { tag: "work" });
+    addTask(data, "Work task 2", { tag: "work" });
+    deleteTask(data, 1, "work");
+
+    const workTasks = data.tasks.filter((t) => t.tag === "work");
+    expect(workTasks).toHaveLength(1);
+    expect(workTasks[0].id).toBe(1);
+    expect(data.tagCounters["work"]).toBe(2);
+
+    // Untagged tasks should be untouched
+    const untagged = data.tasks.filter((t) => !t.tag);
+    expect(untagged).toHaveLength(2);
+    expect(untagged.map((t) => t.id)).toEqual([1, 2]);
   });
 });
 
@@ -246,6 +292,35 @@ describe("markTodo", () => {
   it("returns error for non-existent ID", () => {
     const result = markTodo(data, 999);
     expect(result.error).toContain("No task found");
+  });
+});
+
+describe("updateDueDate", () => {
+  beforeEach(() => {
+    addTask(data, "Task with due date", { dueDate: "2026-06-01" });
+  });
+
+  it("updates the due date", () => {
+    const result = updateDueDate(data, 1, "2026-12-25");
+    expect(result.task.dueDate).toBe("2026-12-25");
+    expect(result.task.updatedAt).toBeDefined();
+  });
+
+  it("clears due date when set to null", () => {
+    const result = updateDueDate(data, 1, null);
+    expect(result.task.dueDate).toBeNull();
+  });
+
+  it("returns error for non-existent ID", () => {
+    const result = updateDueDate(data, 999, "2026-12-25");
+    expect(result.error).toContain("No task found");
+  });
+
+  it("updates by tag when same ID exists in multiple tags", () => {
+    addTask(data, "Work task", { tag: "work", dueDate: "2026-06-01" });
+    const result = updateDueDate(data, 1, "2026-12-31", "work");
+    expect(result.task.tag).toBe("work");
+    expect(result.task.dueDate).toBe("2026-12-31");
   });
 });
 
@@ -314,7 +389,7 @@ describe("undoAction", () => {
     undoAction(data);
 
     expect(data.tasks).toHaveLength(0);
-    expect(data.nextId).toBe(1);
+    expect(data.tagCounters[""]).toBeUndefined();
   });
 
   it("undoes a delete — restores the deleted task", () => {
@@ -350,6 +425,16 @@ describe("undoAction", () => {
     expect(data.tasks[0].title).toBe("Old title");
   });
 
+  it("undoes an update-due — restores old due date", () => {
+    addTask(data, "Task", { dueDate: "2026-06-01" });
+    updateDueDate(data, 1, "2026-12-25");
+    expect(data.tasks[0].dueDate).toBe("2026-12-25");
+
+    undoAction(data);
+
+    expect(data.tasks[0].dueDate).toBe("2026-06-01");
+  });
+
   it("clears undo state after use — cannot undo twice", () => {
     addTask(data, "Task");
     undoAction(data);
@@ -366,5 +451,14 @@ describe("undoAction", () => {
 
     expect(data.tasks).toHaveLength(1);
     expect(data.tasks[0].title).toBe("Task 1");
+  });
+
+  it("restores tagCounters on undo", () => {
+    addTask(data, "Work task", { tag: "work" });
+    expect(data.tagCounters["work"]).toBe(2);
+
+    undoAction(data);
+
+    expect(data.tagCounters["work"]).toBeUndefined();
   });
 });

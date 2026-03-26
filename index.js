@@ -12,6 +12,12 @@ function clearIfTTY() {
   if (process.stdout.isTTY) console.clear();
 }
 
+async function confirm(message) {
+  if (!process.stdin.isTTY) return true;
+  const { value } = await prompts({ type: "confirm", name: "value", message, initial: true });
+  return value === true;
+}
+
 function renderList(data, statusFilter) {
   const result = listTasks(data, statusFilter);
 
@@ -24,16 +30,11 @@ function renderList(data, statusFilter) {
     if (statusFilter) {
       console.log(`${logSymbols.info} No tasks with status "${chalk.bold(statusFilter)}".`);
     } else {
-      console.log(`${logSymbols.info} No tasks yet. Use ${chalk.cyan('task-cli add "Your task"')} to create one.`);
+      console.log(`${logSymbols.info} No tasks yet. Use ${chalk.cyan('tsk add "Your task"')} to create one.`);
     }
   } else {
     const table = new Table({
-      head: [
-        chalk.bold("ID"),
-        chalk.bold("Status"),
-        chalk.bold("Title"),
-        chalk.bold("Created"),
-      ],
+      head: [chalk.bold("ID"), chalk.bold("Status"), chalk.bold("Title"), chalk.bold("Created")],
       style: { head: ["cyan"], border: ["gray"] },
     });
 
@@ -48,17 +49,20 @@ function renderList(data, statusFilter) {
     console.log(table.toString());
   }
 
-  // Stats bar (always calculated from all tasks, not filtered view)
   const total = data.tasks.length;
   if (total > 0) {
     const completed = data.tasks.filter((t) => t.status === "done").length;
     const pending = total - completed;
     const rate = Math.round((completed / total) * 100);
+    const rateStr = rate === 100 ? chalk.green.bold(`${rate}% 🏆`) :
+                    rate >= 80  ? chalk.green(`${rate}%`) :
+                    rate >= 50  ? chalk.yellow(`${rate}%`) :
+                                  chalk.red(`${rate}%`);
     console.log(
-      `\n  ${chalk.bold("Total:")} ${total}  ${chalk.gray("│")}  ` +
-      `${chalk.bold("Completed:")} ${chalk.green(completed)}  ${chalk.gray("│")}  ` +
-      `${chalk.bold("Pending:")} ${chalk.yellow(pending)}  ${chalk.gray("│")}  ` +
-      `${chalk.bold("Rate:")} ${rate}%\n`
+      `\n  📝 ${chalk.bold("Total:")} ${chalk.white.bold(total)}   ` +
+      `✅ ${chalk.bold("Completed:")} ${chalk.green.bold(completed)}   ` +
+      `⏳ ${chalk.bold("Pending:")} ${chalk.yellow.bold(pending)}   ` +
+      `🎯 ${chalk.bold("Rate:")} ${rateStr}\n`
     );
   }
 }
@@ -66,18 +70,30 @@ function renderList(data, statusFilter) {
 program
   .name("task-cli")
   .description("A simple CLI task manager for everyday to-do tracking")
-  .version("1.0.0");
+  .version("1.0.0")
+  .addHelpText("after", `
+${chalk.bold("Aliases (shortcuts):")}
+  tsk a   →  tsk add
+  tsk l   →  tsk list
+  tsk d   →  tsk done
+  tsk del →  tsk delete
+  tsk u   →  tsk update
+`);
 
 program
   .command("add")
   .alias("a")
   .description("Add a new task")
   .argument("<title>", "The task title")
-  .action((title) => {
-    clearIfTTY();
+  .option("-y, --yes", "Skip confirmation prompt")
+  .action(async (title, options) => {
     const data = loadData();
-    const result = addTask(data, title);
 
+    const ok = options.yes || await confirm(`Add task "${chalk.cyan(title)}"?`);
+    if (!ok) { console.log(`${logSymbols.info} Cancelled.`); return; }
+
+    clearIfTTY();
+    const result = addTask(data, title);
     if (result.error) {
       console.error(`${logSymbols.error} ${chalk.red(result.error)}`);
       process.exit(1);
@@ -92,7 +108,7 @@ program
   .command("list")
   .alias("l")
   .description("List all tasks")
-  .option("--status <status>", "Filter by status (todo or done)")
+  .option("--status <status>", "Filter by status: todo or done")
   .action((options) => {
     clearIfTTY();
     const data = loadData();
@@ -104,11 +120,19 @@ program
   .alias("d")
   .description("Mark a task as completed")
   .argument("<id>", "The task ID")
-  .action((id) => {
-    clearIfTTY();
+  .option("-y, --yes", "Skip confirmation prompt")
+  .action(async (id, options) => {
     const data = loadData();
-    const result = markDone(data, id);
+    const numId = Number(id);
+    const existingTask = data.tasks.find((t) => t.id === numId);
 
+    if (existingTask) {
+      const ok = options.yes || await confirm(`Mark task #${id} "${chalk.cyan(existingTask.title)}" as done?`);
+      if (!ok) { console.log(`${logSymbols.info} Cancelled.`); return; }
+    }
+
+    clearIfTTY();
+    const result = markDone(data, id);
     if (result.error) {
       console.error(`${logSymbols.error} ${chalk.red(result.error)}`);
       process.exit(1);
@@ -126,30 +150,17 @@ program
   .argument("<id>", "The task ID")
   .option("-y, --yes", "Skip confirmation prompt")
   .action(async (id, options) => {
-    clearIfTTY();
     const data = loadData();
+    const numId = Number(id);
+    const existingTask = data.tasks.find((t) => t.id === numId);
 
-    if (process.stdin.isTTY && !options.yes) {
-      const numId = Number(id);
-      const existingTask = data.tasks.find((t) => t.id === numId);
-
-      if (existingTask) {
-        const response = await prompts({
-          type: "confirm",
-          name: "value",
-          message: `Delete task #${id} "${existingTask.title}"?`,
-          initial: false,
-        });
-
-        if (!response.value) {
-          console.log(`${logSymbols.info} Deletion cancelled.`);
-          return;
-        }
-      }
+    if (existingTask) {
+      const ok = options.yes || await confirm(`🗑️  Delete task #${id} "${chalk.red(existingTask.title)}"?`);
+      if (!ok) { console.log(`${logSymbols.info} Deletion cancelled.`); return; }
     }
 
+    clearIfTTY();
     const result = deleteTask(data, id);
-
     if (result.error) {
       console.error(`${logSymbols.error} ${chalk.red(result.error)}`);
       process.exit(1);
@@ -166,11 +177,19 @@ program
   .description("Update a task's title")
   .argument("<id>", "The task ID")
   .argument("<title>", "The new title")
-  .action((id, title) => {
-    clearIfTTY();
+  .option("-y, --yes", "Skip confirmation prompt")
+  .action(async (id, title, options) => {
     const data = loadData();
-    const result = updateTask(data, id, title);
+    const numId = Number(id);
+    const existingTask = data.tasks.find((t) => t.id === numId);
 
+    if (existingTask) {
+      const ok = options.yes || await confirm(`Update task #${id} "${chalk.dim(existingTask.title)}" → "${chalk.cyan(title)}"?`);
+      if (!ok) { console.log(`${logSymbols.info} Cancelled.`); return; }
+    }
+
+    clearIfTTY();
+    const result = updateTask(data, id, title);
     if (result.error) {
       console.error(`${logSymbols.error} ${chalk.red(result.error)}`);
       process.exit(1);
@@ -184,11 +203,17 @@ program
 program
   .command("undo")
   .description("Undo the last action")
-  .action(() => {
-    clearIfTTY();
+  .option("-y, --yes", "Skip confirmation prompt")
+  .action(async (options) => {
     const data = loadData();
-    const result = undoAction(data);
 
+    if (data.undo) {
+      const ok = options.yes || await confirm("↩️  Undo last action?");
+      if (!ok) { console.log(`${logSymbols.info} Cancelled.`); return; }
+    }
+
+    clearIfTTY();
+    const result = undoAction(data);
     if (result.error) {
       console.error(`${logSymbols.error} ${chalk.red(result.error)}`);
       process.exit(1);

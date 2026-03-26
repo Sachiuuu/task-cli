@@ -1,9 +1,9 @@
-const { addTask, listTasks, markDone, deleteTask, updateTask } = require("../src/task");
+const { addTask, listTasks, markDone, deleteTask, updateTask, undoAction } = require("../src/task");
 
 let data;
 
 beforeEach(() => {
-  data = { nextId: 1, tasks: [] };
+  data = { nextId: 1, tasks: [], undo: null };
 });
 
 describe("addTask", () => {
@@ -200,5 +200,73 @@ describe("updateTask", () => {
   it("returns error for non-existent ID", () => {
     const result = updateTask(data, 999, "New title");
     expect(result.error).toContain("No task found");
+  });
+});
+
+describe("undoAction", () => {
+  it("returns error when nothing to undo", () => {
+    const result = undoAction(data);
+    expect(result.error).toContain("Nothing to undo");
+  });
+
+  it("undoes an add — removes the added task", () => {
+    addTask(data, "Task to undo");
+    expect(data.tasks).toHaveLength(1);
+
+    undoAction(data);
+
+    expect(data.tasks).toHaveLength(0);
+    expect(data.nextId).toBe(1);
+  });
+
+  it("undoes a delete — restores the deleted task", () => {
+    addTask(data, "Task A");
+    addTask(data, "Task B");
+    deleteTask(data, 1);
+    expect(data.tasks).toHaveLength(1);
+
+    undoAction(data);
+
+    expect(data.tasks).toHaveLength(2);
+    expect(data.tasks[0].title).toBe("Task A");
+    expect(data.tasks[1].title).toBe("Task B");
+  });
+
+  it("undoes a done — restores task to todo", () => {
+    addTask(data, "Task A");
+    markDone(data, 1);
+    expect(data.tasks[0].status).toBe("done");
+
+    undoAction(data);
+
+    expect(data.tasks[0].status).toBe("todo");
+  });
+
+  it("undoes an update — restores old title", () => {
+    addTask(data, "Old title");
+    updateTask(data, 1, "New title");
+    expect(data.tasks[0].title).toBe("New title");
+
+    undoAction(data);
+
+    expect(data.tasks[0].title).toBe("Old title");
+  });
+
+  it("clears undo state after use — cannot undo twice", () => {
+    addTask(data, "Task");
+    undoAction(data);
+
+    const result = undoAction(data);
+    expect(result.error).toContain("Nothing to undo");
+  });
+
+  it("saves undo snapshot before each mutation", () => {
+    addTask(data, "Task 1");
+    addTask(data, "Task 2");
+    // undo only goes back one step (last mutation)
+    undoAction(data);
+
+    expect(data.tasks).toHaveLength(1);
+    expect(data.tasks[0].title).toBe("Task 1");
   });
 });

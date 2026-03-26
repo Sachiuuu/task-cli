@@ -1,5 +1,12 @@
 const MAX_TITLE_LENGTH = 200;
 
+function saveUndoSnapshot(data) {
+  data.undo = {
+    nextId: data.nextId,
+    tasks: data.tasks.map((t) => ({ ...t })),
+  };
+}
+
 function validateTitle(title) {
   if (typeof title !== "string" || title.trim().length === 0) {
     return { valid: false, message: "Task title cannot be empty. Please provide a title for your task." };
@@ -34,6 +41,7 @@ function addTask(data, title) {
     return { error: validation.message };
   }
 
+  saveUndoSnapshot(data);
   const now = new Date().toISOString();
   const task = {
     id: data.nextId,
@@ -71,6 +79,7 @@ function markDone(data, id) {
     return { error: `Task #${result.task.id} is already marked as done.` };
   }
 
+  saveUndoSnapshot(data);
   result.task.status = "done";
   result.task.updatedAt = new Date().toISOString();
 
@@ -81,6 +90,7 @@ function deleteTask(data, id) {
   const result = findTask(data, id);
   if (result.error) return result;
 
+  saveUndoSnapshot(data);
   const index = data.tasks.indexOf(result.task);
   data.tasks.splice(index, 1);
 
@@ -102,10 +112,23 @@ function updateTask(data, id, newTitle) {
   const result = findTask(data, id);
   if (result.error) return result;
 
+  saveUndoSnapshot(data);
   result.task.title = newTitle.trim();
   result.task.updatedAt = new Date().toISOString();
 
   return { task: result.task };
 }
 
-module.exports = { addTask, listTasks, markDone, deleteTask, updateTask };
+function undoAction(data) {
+  if (!data.undo) {
+    return { error: "Nothing to undo. No previous action found." };
+  }
+
+  data.tasks = data.undo.tasks;
+  data.nextId = data.undo.nextId;
+  data.undo = null;
+
+  return { success: true };
+}
+
+module.exports = { addTask, listTasks, markDone, deleteTask, updateTask, undoAction };

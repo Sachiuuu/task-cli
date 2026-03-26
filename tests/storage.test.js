@@ -25,7 +25,7 @@ describe("storage", () => {
     const { loadData } = require("../src/storage");
     const data = loadData();
 
-    expect(data).toEqual({ nextId: 1, tasks: [] });
+    expect(data).toEqual({ nextId: 1, tasks: [], undo: null });
   });
 
   it("saves and loads data correctly (round-trip)", () => {
@@ -36,6 +36,7 @@ describe("storage", () => {
         { id: 1, title: "Test task", status: "todo", createdAt: "2026-01-01T00:00:00.000Z", updatedAt: "2026-01-01T00:00:00.000Z" },
         { id: 2, title: "Done task", status: "done", createdAt: "2026-01-01T00:00:00.000Z", updatedAt: "2026-01-02T00:00:00.000Z" },
       ],
+      undo: null,
     };
 
     saveData(original);
@@ -50,7 +51,7 @@ describe("storage", () => {
 
     const data = loadData();
 
-    expect(data).toEqual({ nextId: 1, tasks: [] });
+    expect(data).toEqual({ nextId: 1, tasks: [], undo: null });
   });
 
   it("handles JSON with invalid structure gracefully", () => {
@@ -59,7 +60,7 @@ describe("storage", () => {
 
     const data = loadData();
 
-    expect(data).toEqual({ nextId: 1, tasks: [] });
+    expect(data).toEqual({ nextId: 1, tasks: [], undo: null });
   });
 
   it("persists data between separate load calls (simulates closing and reopening terminal)", () => {
@@ -67,6 +68,7 @@ describe("storage", () => {
     const original = {
       nextId: 2,
       tasks: [{ id: 1, title: "Persistent task", status: "todo", createdAt: "2026-01-01T00:00:00.000Z", updatedAt: "2026-01-01T00:00:00.000Z" }],
+      undo: null,
     };
 
     saveData(original);
@@ -86,7 +88,7 @@ describe("storage", () => {
     delete require.cache[require.resolve("../src/storage")];
     const { saveData, loadData } = require("../src/storage");
 
-    const data = { nextId: 1, tasks: [] };
+    const data = { nextId: 1, tasks: [], undo: null };
     saveData(data);
     const loaded = loadData();
 

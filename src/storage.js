@@ -9,7 +9,7 @@ function getDataPath() {
 }
 
 function getDefaultData() {
-  return { nextId: 1, tasks: [] };
+  return { nextId: 1, tasks: [], undo: null };
 }
 
 function loadData() {
@@ -26,6 +26,11 @@ function loadData() {
     if (!data || !Array.isArray(data.tasks) || typeof data.nextId !== "number") {
       console.warn("Warning: Data file was corrupted. Starting with an empty task list.");
       return getDefaultData();
+    }
+
+    // Backward-compat: add undo field if missing (older data files)
+    if (!("undo" in data)) {
+      data.undo = null;
     }
 
     return data;

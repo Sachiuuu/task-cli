@@ -39,4 +39,24 @@ This document logs all prompts used during the development of task-cli.
 
 ---
 
-**Prompts used: 1 / 20**
+## Prompt 2 (ID Renumbering + New Libraries)
+
+**Prompt:**
+
+> Ya probe el CLI y por el momento todo bien, lo unico que tocaria configurar seria el id de las tareas cuando se eliminan, me explico, tengo tres tareas y cada una tiene su respectivo id, al eliminar por ejemplo el id #1 y despues llamar el comando task-cli list se puede ver el id #2 y #3, cuando estos se deberian actualizar y restar uno pasando de 2 -> 1 y el 3 -> 2. Tambien me gustaria agregar las siguientes librerias para personalizar mas el CLI y q el usuario se sineta mas comodo. Chalk para los colores, log-symbols para un feedback mas claro y ayudar a usuarios de entrada, cli-table3 para mejorar el listado de tareas y prompts para una mejor interaccion consola a usuario y usuario consola.
+
+**What was done:**
+- Updated `src/task.js`: `deleteTask` now renumbers remaining tasks sequentially from 1 after any deletion
+- Installed chalk@4, log-symbols@4, cli-table3, prompts (CJS-compatible versions)
+- Updated `index.js` with full UI overhaul: colored output, ✔/✖/ℹ symbols, table-based list, delete confirmation prompt
+- Updated `tests/task.test.js` to reflect new renumbering behavior
+- Updated `DECISIONS.md` decision #2 to reflect the renumbering approach
+- All 45 tests still passing
+
+**Git commits produced:**
+7. `Renumber task IDs sequentially after deletion`
+8. `Add chalk, log-symbols, cli-table3, prompts for improved UX`
+
+---
+
+**Prompts used: 2 / 20**

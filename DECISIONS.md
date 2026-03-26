@@ -31,15 +31,15 @@
 - **Timestamp-based IDs:** Unique without a counter but long and unreadable.
 - **Array index:** Simplest implementation but breaks when tasks are deleted.
 
-**Why integers:**
+**Why integers with renumbering:**
 - Users type IDs on the command line. `task-cli done 3` is far more ergonomic than `task-cli done a1b2c3d4-e5f6-7890-abcd-ef1234567890`.
+- After deletion, remaining tasks are renumbered from 1 so the list always shows a clean, gapless sequence (1, 2, 3...).
 - Easy to reference in conversation: "Did you finish task 3?"
-- The `nextId` counter ensures IDs never collide or get reused, maintaining data integrity.
 
 **Tradeoffs:**
-- Gaps appear after deletion (e.g., IDs 1, 3, 4 after deleting task 2), which could confuse some users.
-- IDs grow indefinitely — but for a personal task manager this is a non-issue (you'd need millions of tasks).
-- Reusing IDs after deletion would be worse: if you delete task 2 and a new task gets ID 2, it creates ambiguity about which "task 2" is referenced.
+- Renumbering means an ID can refer to a different task after a deletion (e.g., "task 3" may become "task 2"). Users must re-check the list after any deletion.
+- IDs are not stable references — if you note down an ID and delete a lower-numbered task, your note is wrong. Stable UUIDs would avoid this but are unusable on a command line.
+- The `nextId` counter is still used to avoid any chance of collision during a session, even though IDs are renumbered on deletion.
 
 ---
 

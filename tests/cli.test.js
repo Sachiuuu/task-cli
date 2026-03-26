@@ -46,7 +46,7 @@ describe("CLI integration", () => {
 
     expect(stdout).toContain("Task one");
     expect(stdout).toContain("Task two");
-    expect(stdout).toContain("2 task(s)");
+    expect(stdout).toContain("Total: 2");
   });
 
   it("marks a task as done", () => {
@@ -109,6 +109,26 @@ describe("CLI integration", () => {
     expect(stdout).toContain("Persistent task");
   });
 
+  it("undo removes a task that was just added", () => {
+    runCli(["add", "Mistake task"]);
+    runCli(["undo"]);
+    const { stdout } = runCli(["list"]);
+    expect(stdout).toContain("No tasks yet");
+  });
+
+  it("undo restores a deleted task", () => {
+    runCli(["add", "Important task"]);
+    runCli(["delete", "1"]);
+    runCli(["undo"]);
+    const { stdout } = runCli(["list"]);
+    expect(stdout).toContain("Important task");
+  });
+
+  it("undo shows error when nothing to undo", () => {
+    const { stderr } = runCli(["undo"], true);
+    expect(stderr).toContain("Nothing to undo");
+  });
+
   it("handles full workflow: add, done, list, delete", () => {
     runCli(["add", "Step 1"]);
     runCli(["add", "Step 2"]);
@@ -119,6 +139,6 @@ describe("CLI integration", () => {
     expect(stdout).toContain("Step 1");
     expect(stdout).toContain("done");
     expect(stdout).not.toContain("Step 2");
-    expect(stdout).toContain("1 task(s)");
+    expect(stdout).toContain("Total: 1");
   });
 });

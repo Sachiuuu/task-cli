@@ -4,7 +4,8 @@
   "description": "A simple CLI task manager for everyday to-do tracking",
   "main": "index.js",
   "bin": {
-    "task-cli": "./index.js"
+    "task-cli": "./index.js",
+    "t": "./index.js"
   },
   "scripts": {
     "test": "vitest run"

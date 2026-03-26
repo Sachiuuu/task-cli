@@ -1,13 +1,16 @@
 {
   "name": "task-cli",
   "version": "1.0.0",
-  "description": "",
+  "description": "A simple CLI task manager for everyday to-do tracking",
   "main": "index.js",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+  "bin": {
+    "task-cli": "./index.js"
   },
-  "keywords": [],
-  "author": "",
+  "scripts": {
+    "test": "vitest run"
+  },
+  "keywords": ["cli", "task", "todo", "manager"],
+  "author": "Daniel Santiago Diaz Forero",
   "license": "ISC",
   "dependencies": {
     "commander": "^14.0.3"

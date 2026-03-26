@@ -1,4 +1,4 @@
-const { addTask, listTasks, markDone, deleteTask, updateTask, undoAction } = require("../src/task");
+const { addTask, listTasks, markDone, markTodo, deleteTask, updateTask, undoAction, parseDueDate } = require("../src/task");
 
 let data;
 
@@ -14,10 +14,32 @@ describe("addTask", () => {
     expect(result.task.id).toBe(1);
     expect(result.task.title).toBe("Buy groceries");
     expect(result.task.status).toBe("todo");
+    expect(result.task.tag).toBeNull();
+    expect(result.task.dueDate).toBeNull();
     expect(result.task.createdAt).toBeDefined();
     expect(result.task.updatedAt).toBeDefined();
     expect(data.tasks).toHaveLength(1);
     expect(data.nextId).toBe(2);
+  });
+
+  it("adds a task with a tag (lowercased)", () => {
+    const result = addTask(data, "Fix bug", { tag: "Work" });
+    expect(result.task.tag).toBe("work");
+  });
+
+  it("adds a task with a due date", () => {
+    const result = addTask(data, "Doctor appointment", { dueDate: "2026-12-25" });
+    expect(result.task.dueDate).toBe("2026-12-25");
+  });
+
+  it("rejects empty tag", () => {
+    const result = addTask(data, "Task", { tag: "  " });
+    expect(result.error).toContain("Tag cannot be empty");
+  });
+
+  it("rejects tag longer than 30 characters", () => {
+    const result = addTask(data, "Task", { tag: "a".repeat(31) });
+    expect(result.error).toContain("too long");
   });
 
   it("trims whitespace from title", () => {
@@ -200,6 +222,82 @@ describe("updateTask", () => {
   it("returns error for non-existent ID", () => {
     const result = updateTask(data, 999, "New title");
     expect(result.error).toContain("No task found");
+  });
+});
+
+describe("markTodo", () => {
+  beforeEach(() => {
+    addTask(data, "Test task");
+    markDone(data, 1);
+  });
+
+  it("marks a done task back to todo", () => {
+    const result = markTodo(data, 1);
+    expect(result.task.status).toBe("todo");
+    expect(result.task.updatedAt).toBeDefined();
+  });
+
+  it("returns error for already todo task", () => {
+    markTodo(data, 1);
+    const result = markTodo(data, 1);
+    expect(result.error).toContain("already marked as todo");
+  });
+
+  it("returns error for non-existent ID", () => {
+    const result = markTodo(data, 999);
+    expect(result.error).toContain("No task found");
+  });
+});
+
+describe("parseDueDate", () => {
+  it('parses "march 15" format', () => {
+    const { dueDate } = parseDueDate("march 15");
+    expect(dueDate).toMatch(/^\d{4}-03-15$/);
+  });
+
+  it('parses "mar 15" abbreviated month', () => {
+    const { dueDate } = parseDueDate("mar 15");
+    expect(dueDate).toMatch(/^\d{4}-03-15$/);
+  });
+
+  it('parses "3/15" slash format', () => {
+    const { dueDate } = parseDueDate("3/15");
+    expect(dueDate).toMatch(/^\d{4}-03-15$/);
+  });
+
+  it('parses "3-15" dash format', () => {
+    const { dueDate } = parseDueDate("3-15");
+    expect(dueDate).toMatch(/^\d{4}-03-15$/);
+  });
+
+  it('parses "15 march" day-first format', () => {
+    const { dueDate } = parseDueDate("15 march");
+    expect(dueDate).toMatch(/^\d{4}-03-15$/);
+  });
+
+  it("returns error for unrecognized format", () => {
+    const { error } = parseDueDate("next friday");
+    expect(error).toContain("Cannot parse due date");
+  });
+
+  it("returns error for invalid month", () => {
+    const { error } = parseDueDate("13/15");
+    expect(error).toContain("Invalid month");
+  });
+
+  it("returns error for impossible date (Feb 30)", () => {
+    const { error } = parseDueDate("feb 30");
+    expect(error).toContain("Invalid date");
+  });
+
+  it("returns error for invalid day (0)", () => {
+    const { error } = parseDueDate("3/0");
+    expect(error).toContain("Invalid day");
+  });
+
+  it("always returns a YYYY-MM-DD string", () => {
+    const { dueDate } = parseDueDate("december 31");
+    expect(dueDate).toMatch(/^\d{4}-12-31$/);
   });
 });
 

@@ -103,4 +103,26 @@ This document logs all prompts used during the development of task-cli.
 
 ---
 
-**Prompts used: 4 / 20**
+## Prompt 5 (todo command, due dates, tags, git history clean)
+
+**Prompt:**
+
+> el alias 'tsk' no es reconocido como un comando interno u/o externo. Me gustaria agregar otro comando llamado "todo" el cual es lo contrario a done, colocara una tarea q el status sea done a todo. Tambien me gustaria anadir un due date para los tasks, el input del usuario solo requerira nombre/numero de mes + el dia, el ano se tomara automaticamente. Implementar una opcion al crear un task el cual permita colocar un tag, dividiendo las tareas en diferentes areas como: school, work, etc, tomando en cuenta el tag agregar un emoji q ilustre el tag; y separar estos tags en la tabla tambien. Anadiendo a eso me gustaria si es posible q en el commit history del git repository solo este mi nombre en todos los commits pasados y futuros.
+
+**What was done:**
+- Fixed tsk alias by re-running `npm link`
+- Added `markTodo(data, id)` to task.js — opposite of markDone
+- Added `parseDueDate(input)` — parses "march 15", "3/15", "mar 15", "dec 31", etc. Year auto-set (next year if date already passed)
+- Updated `addTask()` to accept `{ dueDate, tag }` options
+- Updated `index.js`: todo command (alias td), --due and --tag options on add, table now has Tag+Due columns, tasks grouped by tag with emoji headers
+- 77 tests passing (added 22 new tests)
+- Removed Co-Authored-By from all past commits using `git filter-branch`
+- Future commits will only have the author's name
+
+**Git commits produced:**
+16. `Add todo command, due dates, tags, and parseDueDate`
+17. `Add todo command, --due/--tag options, tag grouping in list`
+
+---
+
+**Prompts used: 5 / 20**

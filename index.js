@@ -1,6 +1,10 @@
 #!/usr/bin/env node
 
 const { program } = require("commander");
+const chalk = require("chalk");
+const logSymbols = require("log-symbols");
+const Table = require("cli-table3");
+const prompts = require("prompts");
 const { loadData, saveData } = require("./src/storage");
 const { addTask, listTasks, markDone, deleteTask, updateTask } = require("./src/task");
 
@@ -18,12 +22,12 @@ program
     const result = addTask(data, title);
 
     if (result.error) {
-      console.error(`Error: ${result.error}`);
+      console.error(`${logSymbols.error} ${chalk.red(result.error)}`);
       process.exit(1);
     }
 
     saveData(data);
-    console.log(`Task added: #${result.task.id} "${result.task.title}"`);
+    console.log(`${logSymbols.success} Task added: ${chalk.bold("#" + result.task.id)} "${chalk.cyan(result.task.title)}"`);
   });
 
 program
@@ -35,30 +39,39 @@ program
     const result = listTasks(data, options.status);
 
     if (result.error) {
-      console.error(`Error: ${result.error}`);
+      console.error(`${logSymbols.error} ${chalk.red(result.error)}`);
       process.exit(1);
     }
 
     if (result.tasks.length === 0) {
       if (options.status) {
-        console.log(`No tasks with status "${options.status}".`);
+        console.log(`${logSymbols.info} No tasks with status "${chalk.bold(options.status)}".`);
       } else {
-        console.log("No tasks yet. Use 'task-cli add \"Your task\"' to create one.");
+        console.log(`${logSymbols.info} No tasks yet. Use ${chalk.cyan('task-cli add "Your task"')} to create one.`);
       }
       return;
     }
 
-    console.log("");
-    console.log("  ID  | Status | Title");
-    console.log("  ----|--------|------");
+    const table = new Table({
+      head: [
+        chalk.bold("ID"),
+        chalk.bold("Status"),
+        chalk.bold("Title"),
+        chalk.bold("Created"),
+      ],
+      style: { head: ["cyan"], border: ["gray"] },
+    });
+
     for (const task of result.tasks) {
-      const status = task.status === "done" ? "done " : "todo ";
-      const id = String(task.id).padStart(3, " ");
-      console.log(`  ${id} | ${status}  | ${task.title}`);
+      const isDone = task.status === "done";
+      const status = isDone ? chalk.green("✓ done") : chalk.yellow("○ todo");
+      const title = isDone ? chalk.dim(task.title) : task.title;
+      const created = new Date(task.createdAt).toLocaleDateString();
+      table.push([chalk.bold(String(task.id)), status, title, created]);
     }
-    console.log("");
-    console.log(`  Total: ${result.tasks.length} task(s)`);
-    console.log("");
+
+    console.log(table.toString());
+    console.log(chalk.dim(`  ${result.tasks.length} task(s) total`));
   });
 
 program
@@ -70,29 +83,50 @@ program
     const result = markDone(data, id);
 
     if (result.error) {
-      console.error(`Error: ${result.error}`);
+      console.error(`${logSymbols.error} ${chalk.red(result.error)}`);
       process.exit(1);
     }
 
     saveData(data);
-    console.log(`Task #${result.task.id} marked as done: "${result.task.title}"`);
+    console.log(`${logSymbols.success} Task ${chalk.bold("#" + result.task.id)} marked as done: "${chalk.dim(result.task.title)}"`);
   });
 
 program
   .command("delete")
   .description("Delete a task")
   .argument("<id>", "The task ID")
-  .action((id) => {
+  .option("-y, --yes", "Skip confirmation prompt")
+  .action(async (id, options) => {
     const data = loadData();
+
+    if (process.stdin.isTTY && !options.yes) {
+      const numId = Number(id);
+      const existingTask = data.tasks.find((t) => t.id === numId);
+
+      if (existingTask) {
+        const response = await prompts({
+          type: "confirm",
+          name: "value",
+          message: `Delete task #${id} "${existingTask.title}"?`,
+          initial: false,
+        });
+
+        if (!response.value) {
+          console.log(`${logSymbols.info} Deletion cancelled.`);
+          return;
+        }
+      }
+    }
+
     const result = deleteTask(data, id);
 
     if (result.error) {
-      console.error(`Error: ${result.error}`);
+      console.error(`${logSymbols.error} ${chalk.red(result.error)}`);
       process.exit(1);
     }
 
     saveData(data);
-    console.log(`Task #${result.task.id} deleted: "${result.task.title}"`);
+    console.log(`${logSymbols.success} Task ${chalk.bold("#" + result.task.id)} deleted: "${chalk.dim(result.task.title)}"`);
   });
 
 program
@@ -105,12 +139,12 @@ program
     const result = updateTask(data, id, title);
 
     if (result.error) {
-      console.error(`Error: ${result.error}`);
+      console.error(`${logSymbols.error} ${chalk.red(result.error)}`);
       process.exit(1);
     }
 
     saveData(data);
-    console.log(`Task #${result.task.id} updated: "${result.task.title}"`);
+    console.log(`${logSymbols.success} Task ${chalk.bold("#" + result.task.id)} updated: "${chalk.cyan(result.task.title)}"`);
   });
 
-program.parse();
+program.parseAsync();

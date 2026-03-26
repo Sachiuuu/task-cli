@@ -9,11 +9,20 @@
   "scripts": {
     "test": "vitest run"
   },
-  "keywords": ["cli", "task", "todo", "manager"],
+  "keywords": [
+    "cli",
+    "task",
+    "todo",
+    "manager"
+  ],
   "author": "Daniel Santiago Diaz Forero",
   "license": "ISC",
   "dependencies": {
-    "commander": "^14.0.3"
+    "chalk": "^4.1.2",
+    "cli-table3": "^0.6.5",
+    "commander": "^14.0.3",
+    "log-symbols": "^4.1.0",
+    "prompts": "^2.4.2"
   },
   "devDependencies": {
     "vitest": "^4.1.2"

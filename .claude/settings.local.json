@@ -1,0 +1,38 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node -e \"console.log\\(require\\(''commander/package.json''\\).version\\)\")",
+      "Bash(node -e \"const {Command} = require\\(''commander''\\); console.log\\(''commander OK''\\)\")",
+      "Bash(export TASK_CLI_DATA_PATH=\"/tmp/test-task-cli.json\")",
+      "Bash(node index.js add \"Buy groceries\")",
+      "Bash(node index.js add \"Walk the dog\")",
+      "Bash(node index.js list)",
+      "Bash(node index.js done 1)",
+      "Bash(npx vitest:*)",
+      "Bash(npm install:*)",
+      "Bash(export TASK_CLI_DATA_PATH=\"/tmp/demo-tasks.json\")",
+      "Bash(node index.js add \"Read a book\")",
+      "Bash(node index.js done 2)",
+      "Bash(node index.js delete 1 --yes)",
+      "Bash(rm -f /tmp/demo-tasks.json)",
+      "Bash(export TASK_CLI_DATA_PATH=\"/tmp/demo2.json\")",
+      "Bash(node index.js a \"Buy milk\")",
+      "Bash(node index.js a \"Call doctor\")",
+      "Bash(node index.js a \"Fix bug\")",
+      "Bash(node index.js d 2)",
+      "Bash(export TASK_CLI_DATA_PATH=\"/tmp/demo3.json\")",
+      "Bash(node index.js add \"Buy milk\" --yes)",
+      "Bash(node index.js add \"Call dentist\" --yes)",
+      "Bash(node index.js add \"Fix bug\" --yes)",
+      "Bash(node index.js done 2 --yes)",
+      "Bash(node index.js --help)",
+      "Bash(export TASK_CLI_DATA_PATH=\"/tmp/demo4.json\")",
+      "Bash(node index.js add \"Fix deployment bug\" --tag work --due \"april 2\" --yes)",
+      "Bash(node index.js add \"Read chapter 5\" --tag school --due \"march 30\" --yes)",
+      "Bash(node index.js add \"Buy groceries\" --yes)",
+      "Bash(node index.js add \"Call doctor\" --tag health --due \"april 10\" --yes)",
+      "Bash(FILTER_BRANCH_SQUELCH_WARNING=1 git filter-branch -f --msg-filter 'sed \"\"/^Co-Authored-By:/d\"\"' -- --all)",
+      "Bash(npm link:*)"
+    ]
+  }
+}

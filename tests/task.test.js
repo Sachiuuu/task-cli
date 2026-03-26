@@ -65,14 +65,14 @@ describe("addTask", () => {
     expect(result.error).toContain("cannot be empty");
   });
 
-  it("never reuses IDs after deletion", () => {
+  it("renumbers IDs sequentially after deletion", () => {
     addTask(data, "Task 1");
     addTask(data, "Task 2");
-    deleteTask(data, 1);
     addTask(data, "Task 3");
+    deleteTask(data, 2);
 
-    expect(data.tasks.map((t) => t.id)).toEqual([2, 3]);
-    expect(data.nextId).toBe(4);
+    expect(data.tasks.map((t) => t.id)).toEqual([1, 2]);
+    expect(data.nextId).toBe(3);
   });
 });
 
@@ -163,11 +163,12 @@ describe("deleteTask", () => {
     addTask(data, "Task to keep");
   });
 
-  it("removes the task from the list", () => {
+  it("removes the task and renumbers remaining tasks from 1", () => {
     const result = deleteTask(data, 1);
     expect(result.task.title).toBe("Task to delete");
     expect(data.tasks).toHaveLength(1);
-    expect(data.tasks[0].id).toBe(2);
+    expect(data.tasks[0].id).toBe(1);
+    expect(data.nextId).toBe(2);
   });
 
   it("returns error for non-existent ID", () => {

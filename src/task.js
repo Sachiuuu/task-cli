@@ -84,6 +84,12 @@ function deleteTask(data, id) {
   const index = data.tasks.indexOf(result.task);
   data.tasks.splice(index, 1);
 
+  // Renumber remaining tasks sequentially starting from 1
+  data.tasks.forEach((task, i) => {
+    task.id = i + 1;
+  });
+  data.nextId = data.tasks.length + 1;
+
   return { task: result.task };
 }
 

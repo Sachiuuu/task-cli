@@ -7,7 +7,7 @@ const Table = require("cli-table3");
 const prompts = require("prompts");
 const { loadData, saveData } = require("./src/storage");
 const {
-  addTask, listTasks, markDone, markTodo, deleteTask, updateTask, undoAction, parseDueDate,
+  addTask, listTasks, markDone, markTodo, deleteTask, updateTask, updateDueDate, undoAction, parseDueDate,
 } = require("./src/task");
 
 // ─── Tag emoji map ────────────────────────────────────────────────────────────
@@ -77,52 +77,53 @@ function renderList(data, statusFilter) {
       console.log(`${logSymbols.info} No tasks yet. Use ${chalk.cyan('tsk add "Your task"')} to create one.`);
     }
   } else {
-    // Sort: tagged tasks first (alphabetically by tag), untagged last
-    const sorted = [...result.tasks].sort((a, b) => {
-      if (a.tag === b.tag) return 0;
-      if (!a.tag) return 1;
-      if (!b.tag) return -1;
-      return a.tag.localeCompare(b.tag);
-    });
-
-    const anyTagged = sorted.some((t) => t.tag);
-
-    const table = new Table({
-      head: [
-        chalk.bold("ID"),
-        chalk.bold("Status"),
-        chalk.bold("Tag"),
-        chalk.bold("Title"),
-        chalk.bold("Due"),
-      ],
-      style: { head: ["cyan"], border: ["gray"] },
-    });
-
-    let currentTag = Symbol("init");
-
-    for (const task of sorted) {
-      const taskTag = task.tag || null;
-
-      // Insert section header when tag group changes
-      if (anyTagged && taskTag !== currentTag) {
-        currentTag = taskTag;
-        const header = taskTag
-          ? chalk.bold.cyan(`  ${tagEmoji(taskTag)}  ${taskTag.toUpperCase()}`)
-          : chalk.dim("  ─── Other ───");
-        table.push([{ content: header, colSpan: 5 }]);
-      }
-
-      const isDone = task.status === "done";
-      table.push([
-        chalk.bold(String(task.id)),
-        isDone ? chalk.green("✓ done") : chalk.yellow("○ todo"),
-        task.tag ? `${tagEmoji(task.tag)} ${task.tag}` : "",
-        isDone ? chalk.dim(task.title) : task.title,
-        dueDateCell(task.dueDate),
-      ]);
+    // Group tasks by tag
+    const groups = new Map();
+    for (const task of result.tasks) {
+      const key = task.tag || "";
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push(task);
     }
 
-    console.log(table.toString());
+    // Sort groups: tagged alphabetically, untagged ("") last
+    const sortedKeys = [...groups.keys()].sort((a, b) => {
+      if (a === "" && b !== "") return 1;
+      if (a !== "" && b === "") return -1;
+      return a.localeCompare(b);
+    });
+
+    for (const key of sortedKeys) {
+      const tasks = groups.get(key).sort((a, b) => a.id - b.id);
+
+      // Print tag section header
+      if (key) {
+        console.log(`\n  ${chalk.bold.cyan(`${tagEmoji(key)}  ${key.toUpperCase()}`)}`);
+      } else {
+        console.log(chalk.dim("\n  ─── Other ───"));
+      }
+
+      const table = new Table({
+        head: [
+          chalk.bold("ID"),
+          chalk.bold("Status"),
+          chalk.bold("Title"),
+          chalk.bold("Due"),
+        ],
+        style: { head: ["cyan"], border: ["gray"] },
+      });
+
+      for (const task of tasks) {
+        const isDone = task.status === "done";
+        table.push([
+          chalk.bold(String(task.id)),
+          isDone ? chalk.green("✓ done") : chalk.yellow("○ todo"),
+          isDone ? chalk.dim(task.title) : task.title,
+          dueDateCell(task.dueDate),
+        ]);
+      }
+
+      console.log(table.toString());
+    }
   }
 
   // Stats bar
@@ -158,6 +159,7 @@ ${chalk.bold("Aliases (shortcuts):")}
   tsk td  →  tsk todo
   tsk del →  tsk delete
   tsk u   →  tsk update
+  tsk ud  →  tsk update-due
 `);
 
 // ─── add ──────────────────────────────────────────────────────────────────────
@@ -208,7 +210,7 @@ program
 program
   .command("list")
   .alias("l")
-  .description("List all tasks")
+  .description("List all tasks, grouped by tag")
   .option("--status <status>", "Filter by status: todo or done")
   .action((options) => {
     clearIfTTY();
@@ -222,10 +224,12 @@ program
   .alias("d")
   .description("Mark a task as completed")
   .argument("<id>", "The task ID")
+  .option("--tag <tag>", "Tag to disambiguate when the same ID exists in multiple tags")
   .option("-y, --yes", "Skip confirmation prompt")
   .action(async (id, options) => {
     const data = loadData();
-    const existing = data.tasks.find((t) => t.id === Number(id));
+    const tag = options.tag ? options.tag.trim().toLowerCase() : null;
+    const existing = data.tasks.find((t) => t.id === Number(id) && (tag === null || (t.tag || "") === tag));
 
     if (existing) {
       const ok = options.yes || await confirm(`Mark task #${id} "${chalk.cyan(existing.title)}" as done?`);
@@ -233,7 +237,7 @@ program
     }
 
     clearIfTTY();
-    const result = markDone(data, id);
+    const result = markDone(data, id, tag);
     if (result.error) {
       console.error(`${logSymbols.error} ${chalk.red(result.error)}`);
       process.exit(1);
@@ -250,10 +254,12 @@ program
   .alias("td")
   .description("Mark a done task back to todo")
   .argument("<id>", "The task ID")
+  .option("--tag <tag>", "Tag to disambiguate when the same ID exists in multiple tags")
   .option("-y, --yes", "Skip confirmation prompt")
   .action(async (id, options) => {
     const data = loadData();
-    const existing = data.tasks.find((t) => t.id === Number(id));
+    const tag = options.tag ? options.tag.trim().toLowerCase() : null;
+    const existing = data.tasks.find((t) => t.id === Number(id) && (tag === null || (t.tag || "") === tag));
 
     if (existing) {
       const ok = options.yes || await confirm(`Mark task #${id} "${chalk.cyan(existing.title)}" back to todo?`);
@@ -261,7 +267,7 @@ program
     }
 
     clearIfTTY();
-    const result = markTodo(data, id);
+    const result = markTodo(data, id, tag);
     if (result.error) {
       console.error(`${logSymbols.error} ${chalk.red(result.error)}`);
       process.exit(1);
@@ -278,10 +284,12 @@ program
   .alias("del")
   .description("Delete a task")
   .argument("<id>", "The task ID")
+  .option("--tag <tag>", "Tag to disambiguate when the same ID exists in multiple tags")
   .option("-y, --yes", "Skip confirmation prompt")
   .action(async (id, options) => {
     const data = loadData();
-    const existing = data.tasks.find((t) => t.id === Number(id));
+    const tag = options.tag ? options.tag.trim().toLowerCase() : null;
+    const existing = data.tasks.find((t) => t.id === Number(id) && (tag === null || (t.tag || "") === tag));
 
     if (existing) {
       const ok = options.yes || await confirm(`🗑️  Delete task #${id} "${chalk.red(existing.title)}"?`);
@@ -289,7 +297,7 @@ program
     }
 
     clearIfTTY();
-    const result = deleteTask(data, id);
+    const result = deleteTask(data, id, tag);
     if (result.error) {
       console.error(`${logSymbols.error} ${chalk.red(result.error)}`);
       process.exit(1);
@@ -307,10 +315,12 @@ program
   .description("Update a task's title")
   .argument("<id>", "The task ID")
   .argument("<title>", "The new title")
+  .option("--tag <tag>", "Tag to disambiguate when the same ID exists in multiple tags")
   .option("-y, --yes", "Skip confirmation prompt")
   .action(async (id, title, options) => {
     const data = loadData();
-    const existing = data.tasks.find((t) => t.id === Number(id));
+    const tag = options.tag ? options.tag.trim().toLowerCase() : null;
+    const existing = data.tasks.find((t) => t.id === Number(id) && (tag === null || (t.tag || "") === tag));
 
     if (existing) {
       const ok = options.yes || await confirm(`Update task #${id} "${chalk.dim(existing.title)}" → "${chalk.cyan(title)}"?`);
@@ -318,7 +328,7 @@ program
     }
 
     clearIfTTY();
-    const result = updateTask(data, id, title);
+    const result = updateTask(data, id, title, tag);
     if (result.error) {
       console.error(`${logSymbols.error} ${chalk.red(result.error)}`);
       process.exit(1);
@@ -326,6 +336,43 @@ program
 
     saveData(data);
     console.log(`${logSymbols.success} Task ${chalk.bold("#" + result.task.id)} updated: "${chalk.cyan(result.task.title)}"\n`);
+    renderList(data);
+  });
+
+// ─── update-due ───────────────────────────────────────────────────────────────
+program
+  .command("update-due")
+  .alias("ud")
+  .description("Update a task's due date")
+  .argument("<id>", "The task ID")
+  .argument("<date>", 'New due date, e.g. "march 15", "3/15", "mar 15"')
+  .option("--tag <tag>", "Tag to disambiguate when the same ID exists in multiple tags")
+  .option("-y, --yes", "Skip confirmation prompt")
+  .action(async (id, date, options) => {
+    const data = loadData();
+    const tag = options.tag ? options.tag.trim().toLowerCase() : null;
+
+    const parsed = parseDueDate(date);
+    if (parsed.error) {
+      console.error(`${logSymbols.error} ${chalk.red(parsed.error)}`);
+      process.exit(1);
+    }
+
+    const existing = data.tasks.find((t) => t.id === Number(id) && (tag === null || (t.tag || "") === tag));
+    if (existing) {
+      const ok = options.yes || await confirm(`Update due date of task #${id} "${chalk.cyan(existing.title)}" to ${chalk.cyan(formatDueDateShort(parsed.dueDate))}?`);
+      if (!ok) { console.log(`${logSymbols.info} Cancelled.`); return; }
+    }
+
+    clearIfTTY();
+    const result = updateDueDate(data, id, parsed.dueDate, tag);
+    if (result.error) {
+      console.error(`${logSymbols.error} ${chalk.red(result.error)}`);
+      process.exit(1);
+    }
+
+    saveData(data);
+    console.log(`${logSymbols.success} Task ${chalk.bold("#" + result.task.id)} due date updated: "${chalk.cyan(result.task.title)}" → ${chalk.cyan(formatDueDateShort(result.task.dueDate))}\n`);
     renderList(data);
   });
 

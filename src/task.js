@@ -17,7 +17,7 @@ const MONTH_MAP = {
 
 function saveUndoSnapshot(data) {
   data.undo = {
-    nextId: data.nextId,
+    tagCounters: { ...data.tagCounters },
     tasks: data.tasks.map((t) => ({ ...t })),
   };
 }
@@ -32,16 +32,33 @@ function validateTitle(title) {
   return { valid: true };
 }
 
-function findTask(data, id) {
+// Find a task by id, optionally scoped to a tag.
+// tag = undefined/null → search all tasks; multiple matches → error asking for --tag
+function findTask(data, id, tag) {
   const numId = Number(id);
   if (isNaN(numId) || !Number.isInteger(numId) || numId <= 0) {
-    return { error: `"${id}" is not a valid task ID. Please use a positive number (e.g., task-cli done 1).` };
+    return { error: `"${id}" is not a valid task ID. Please use a positive number (e.g., tsk done 1).` };
   }
-  const task = data.tasks.find((t) => t.id === numId);
-  if (!task) {
-    return { error: `No task found with ID ${numId}. Run 'task-cli list' to see your tasks.` };
+
+  if (tag !== undefined && tag !== null) {
+    const normTag = typeof tag === "string" ? tag.trim().toLowerCase() : "";
+    const task = data.tasks.find((t) => t.id === numId && (t.tag || "") === normTag);
+    if (!task) {
+      const label = normTag || "(untagged)";
+      return { error: `No task found with ID ${numId} in tag "${label}". Run 'tsk list' to see your tasks.` };
+    }
+    return { task };
   }
-  return { task };
+
+  const matches = data.tasks.filter((t) => t.id === numId);
+  if (matches.length === 0) {
+    return { error: `No task found with ID ${numId}. Run 'tsk list' to see your tasks.` };
+  }
+  if (matches.length > 1) {
+    const tags = matches.map((t) => t.tag ? `"${t.tag}"` : '"(untagged)"').join(", ");
+    return { error: `Multiple tasks with ID ${numId} exist across tags: ${tags}. Use --tag <tag> to specify which one.` };
+  }
+  return { task: matches[0] };
 }
 
 function parseDueDate(input) {
@@ -99,13 +116,11 @@ function parseDueDate(input) {
   const now = new Date();
   let year = now.getFullYear();
 
-  // Validate the date is real (e.g., reject Feb 30)
   const candidate = new Date(year, month - 1, day);
   if (candidate.getMonth() !== month - 1 || candidate.getDate() !== day) {
     return { error: `Invalid date "${input}". Check the day is valid for that month (e.g., Feb only has 28/29 days).` };
   }
 
-  // Advance to next year if date has already passed
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   if (candidate < today) {
     year++;
@@ -122,9 +137,7 @@ function parseDueDate(input) {
 
 function addTask(data, title, { dueDate = null, tag = null } = {}) {
   const validation = validateTitle(title);
-  if (!validation.valid) {
-    return { error: validation.message };
-  }
+  if (!validation.valid) return { error: validation.message };
 
   if (tag !== null) {
     const trimmed = tag.trim().toLowerCase();
@@ -134,9 +147,12 @@ function addTask(data, title, { dueDate = null, tag = null } = {}) {
   }
 
   saveUndoSnapshot(data);
+  const tagKey = tag || "";
+  if (data.tagCounters[tagKey] === undefined) data.tagCounters[tagKey] = 1;
+
   const now = new Date().toISOString();
   const task = {
-    id: data.nextId,
+    id: data.tagCounters[tagKey],
     title: title.trim(),
     status: "todo",
     tag,
@@ -145,8 +161,8 @@ function addTask(data, title, { dueDate = null, tag = null } = {}) {
     updatedAt: now,
   };
 
+  data.tagCounters[tagKey]++;
   data.tasks.push(task);
-  data.nextId++;
 
   return { task };
 }
@@ -165,8 +181,8 @@ function listTasks(data, statusFilter) {
   return { tasks };
 }
 
-function markDone(data, id) {
-  const result = findTask(data, id);
+function markDone(data, id, tag) {
+  const result = findTask(data, id, tag);
   if (result.error) return result;
 
   if (result.task.status === "done") {
@@ -180,8 +196,8 @@ function markDone(data, id) {
   return { task: result.task };
 }
 
-function markTodo(data, id) {
-  const result = findTask(data, id);
+function markTodo(data, id, tag) {
+  const result = findTask(data, id, tag);
   if (result.error) return result;
 
   if (result.task.status === "todo") {
@@ -195,31 +211,43 @@ function markTodo(data, id) {
   return { task: result.task };
 }
 
-function deleteTask(data, id) {
-  const result = findTask(data, id);
+function deleteTask(data, id, tag) {
+  const result = findTask(data, id, tag);
   if (result.error) return result;
 
   saveUndoSnapshot(data);
+  const taskTag = result.task.tag || "";
   const index = data.tasks.indexOf(result.task);
   data.tasks.splice(index, 1);
 
-  data.tasks.forEach((task, i) => { task.id = i + 1; });
-  data.nextId = data.tasks.length + 1;
+  // Renumber remaining tasks with the same tag from 1
+  const sameTagTasks = data.tasks.filter((t) => (t.tag || "") === taskTag);
+  sameTagTasks.forEach((t, i) => { t.id = i + 1; });
+  data.tagCounters[taskTag] = sameTagTasks.length + 1;
 
   return { task: result.task };
 }
 
-function updateTask(data, id, newTitle) {
+function updateTask(data, id, newTitle, tag) {
   const validation = validateTitle(newTitle);
-  if (!validation.valid) {
-    return { error: validation.message };
-  }
+  if (!validation.valid) return { error: validation.message };
 
-  const result = findTask(data, id);
+  const result = findTask(data, id, tag);
   if (result.error) return result;
 
   saveUndoSnapshot(data);
   result.task.title = newTitle.trim();
+  result.task.updatedAt = new Date().toISOString();
+
+  return { task: result.task };
+}
+
+function updateDueDate(data, id, newDueDate, tag) {
+  const result = findTask(data, id, tag);
+  if (result.error) return result;
+
+  saveUndoSnapshot(data);
+  result.task.dueDate = newDueDate;
   result.task.updatedAt = new Date().toISOString();
 
   return { task: result.task };
@@ -231,12 +259,12 @@ function undoAction(data) {
   }
 
   data.tasks = data.undo.tasks;
-  data.nextId = data.undo.nextId;
+  data.tagCounters = data.undo.tagCounters;
   data.undo = null;
 
   return { success: true };
 }
 
 module.exports = {
-  addTask, listTasks, markDone, markTodo, deleteTask, updateTask, undoAction, parseDueDate,
+  addTask, listTasks, markDone, markTodo, deleteTask, updateTask, updateDueDate, undoAction, parseDueDate,
 };

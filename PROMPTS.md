@@ -59,4 +59,26 @@ This document logs all prompts used during the development of task-cli.
 
 ---
 
-**Prompts used: 2 / 20**
+## Prompt 3 (Undo, Stats, Aliases, Screen Clear)
+
+**Prompt:**
+
+> me gustaria mejorar y agregar ciertas cosas a task-cli. Lo primero es agregar un undo feature el cual el usuario pueda volver hacia atras evitando algun error. Al momento de llamar el list command, mostrarle al usuario los stats de el numero total de sus tareas, como el Total, Completed, pending/todo and completion rate. por ultimo agregar aliases o shortcuts para esos usuarios q quieren eficiencia al usar la herramienta, en vez de task-cli add "smth" -> t a "smth". Tmb me gustaria q cada vez q al inicio de cada comando se haga un re-render completo de la lista utilizando console.clear() para asi no sobrestimular al usuario con informacion previa o confundirlos al utilizar la herramienta.
+
+**What was done:**
+- Added snapshot-based undo to `src/task.js` — saves state before add, done, delete, update
+- Added `undoAction()` function — restores previous snapshot (single level)
+- Added `undo: null` to data model in `src/storage.js` with backward-compat for old files
+- Updated `index.js` with: undo command, stats bar, command aliases, console.clear() (TTY only), auto re-render list after mutations
+- Added `"t": "./index.js"` bin alias in `package.json`
+- Added 6 undo tests in `task.test.js`, 3 undo integration tests in `cli.test.js`
+- All 55 tests passing
+
+**Git commits produced:**
+9. `Add undo feature with snapshot-based state restore`
+10. `Add undo field to data model with backward-compat loading`
+11. `Add stats, undo command, aliases, and screen clear on each command`
+
+---
+
+**Prompts used: 3 / 20**

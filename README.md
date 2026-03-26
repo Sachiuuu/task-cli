@@ -69,10 +69,38 @@ task-cli delete 1
 # Output: Task #1 deleted: "Buy groceries"
 ```
 
+### Undo the last action
+```bash
+task-cli undo
+# Output: ✔ Last action undone.
+```
+Undo works for: add, done, delete, and update. Single level (one step back).
+
 ### Show help
 ```bash
 task-cli --help
 task-cli add --help
+```
+
+## Shortcuts / Aliases
+
+All commands have short aliases for faster typing. You can also use `t` instead of `task-cli`:
+
+| Full command      | Short alias |
+|---|---|
+| `task-cli add`    | `t a`       |
+| `task-cli list`   | `t l`       |
+| `task-cli done`   | `t d`       |
+| `task-cli delete` | `t del`     |
+| `task-cli update` | `t u`       |
+| `task-cli undo`   | `t undo`    |
+
+Example:
+```bash
+t a "Buy milk"
+t l
+t d 1
+t undo
 ```
 
 ## Where is my data stored?

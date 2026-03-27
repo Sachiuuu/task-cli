@@ -101,6 +101,17 @@ async function confirm(message) {
   return value === true;
 }
 
+// Returns the task that would be targeted — mirrors findTask's rule:
+// no tag → untagged only; with tag → that tag only. Returns null if not found.
+function previewTask(data, id, tag) {
+  const numId = Number(id);
+  if (isNaN(numId)) return null;
+  if (tag !== null) {
+    return data.tasks.find((t) => t.id === numId && (t.tag || "") === tag) || null;
+  }
+  return data.tasks.find((t) => t.id === numId && !t.tag) || null;
+}
+
 // ─── List renderer ────────────────────────────────────────────────────────────
 function renderList(data, statusFilter, sortField) {
   const result = listTasks(data, statusFilter);
@@ -292,7 +303,7 @@ program
   .action(async (id, options) => {
     const data = loadData();
     const tag = options.tag ? options.tag.trim().toLowerCase() : null;
-    const existing = data.tasks.find((t) => t.id === Number(id) && (tag === null || (t.tag || "") === tag));
+    const existing = previewTask(data, Number(id), tag);
 
     if (existing) {
       const ok = options.yes || await confirm(`Mark task #${id} "${chalk.cyan(existing.title)}" as done?`);
@@ -322,7 +333,7 @@ program
   .action(async (id, options) => {
     const data = loadData();
     const tag = options.tag ? options.tag.trim().toLowerCase() : null;
-    const existing = data.tasks.find((t) => t.id === Number(id) && (tag === null || (t.tag || "") === tag));
+    const existing = previewTask(data, Number(id), tag);
 
     if (existing) {
       const ok = options.yes || await confirm(`Mark task #${id} "${chalk.cyan(existing.title)}" back to todo?`);
@@ -352,7 +363,7 @@ program
   .action(async (id, options) => {
     const data = loadData();
     const tag = options.tag ? options.tag.trim().toLowerCase() : null;
-    const existing = data.tasks.find((t) => t.id === Number(id) && (tag === null || (t.tag || "") === tag));
+    const existing = previewTask(data, Number(id), tag);
 
     if (existing) {
       const ok = options.yes || await confirm(`🗑️  Delete task #${id} "${chalk.red(existing.title)}"?`);
@@ -383,7 +394,7 @@ program
   .action(async (id, title, options) => {
     const data = loadData();
     const tag = options.tag ? options.tag.trim().toLowerCase() : null;
-    const existing = data.tasks.find((t) => t.id === Number(id) && (tag === null || (t.tag || "") === tag));
+    const existing = previewTask(data, Number(id), tag);
 
     if (existing) {
       const ok = options.yes || await confirm(`Update task #${id} "${chalk.dim(existing.title)}" → "${chalk.cyan(title)}"?`);
@@ -421,7 +432,7 @@ program
       process.exit(1);
     }
 
-    const existing = data.tasks.find((t) => t.id === Number(id) && (tag === null || (t.tag || "") === tag));
+    const existing = previewTask(data, Number(id), tag);
     if (existing) {
       const ok = options.yes || await confirm(`Update due date of task #${id} "${chalk.cyan(existing.title)}" to ${chalk.cyan(formatDueDateShort(parsed.dueDate))}?`);
       if (!ok) { console.log(`${logSymbols.info} Cancelled.`); return; }

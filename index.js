@@ -7,7 +7,7 @@ const Table = require("cli-table3");
 const prompts = require("prompts");
 const { loadData, saveData } = require("./src/storage");
 const {
-  addTask, listTasks, markDone, markTodo, deleteTask, updateTask, updateDueDate, undoAction, parseDueDate,
+  addTask, listTasks, markDone, markTodo, deleteTask, updateTask, updateDueDate, undoAction, parseDueDate, clearAll,
 } = require("./src/task");
 
 // ─── Tag emoji map ────────────────────────────────────────────────────────────
@@ -36,8 +36,48 @@ function formatDueDateShort(dateStr) {
   return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
+function priorityCell(p) {
+  if (p === "high")   return chalk.red.bold("🔴 high");
+  if (p === "medium") return chalk.yellow("🟡 med");
+  if (p === "low")    return chalk.cyan("🔵 low");
+  return chalk.dim("—");
+}
+
+// ─── Sort helper ──────────────────────────────────────────────────────────────
+const PRIORITY_RANK = { high: 0, medium: 1, low: 2 };
+const VALID_SORT_FIELDS = ["priority", "priority-asc", "due", "due-desc"];
+
+function sortTasks(tasks, sortField) {
+  const arr = [...tasks];
+  if (sortField === "priority") {
+    return arr.sort((a, b) =>
+      (PRIORITY_RANK[a.priority] ?? 3) - (PRIORITY_RANK[b.priority] ?? 3));
+  }
+  if (sortField === "priority-asc") {
+    return arr.sort((a, b) =>
+      (PRIORITY_RANK[b.priority] ?? 3) - (PRIORITY_RANK[a.priority] ?? 3));
+  }
+  if (sortField === "due") {
+    return arr.sort((a, b) => {
+      if (!a.dueDate && !b.dueDate) return 0;
+      if (!a.dueDate) return 1;
+      if (!b.dueDate) return -1;
+      return a.dueDate.localeCompare(b.dueDate);
+    });
+  }
+  if (sortField === "due-desc") {
+    return arr.sort((a, b) => {
+      if (!a.dueDate && !b.dueDate) return 0;
+      if (!a.dueDate) return 1;
+      if (!b.dueDate) return -1;
+      return b.dueDate.localeCompare(a.dueDate);
+    });
+  }
+  return arr.sort((a, b) => a.id - b.id);
+}
+
 function dueDateCell(dateStr) {
-  if (!dateStr) return "";
+  if (!dateStr) return chalk.dim("none");
   const d = new Date(dateStr + "T00:00:00");
   const now = new Date();
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -62,7 +102,7 @@ async function confirm(message) {
 }
 
 // ─── List renderer ────────────────────────────────────────────────────────────
-function renderList(data, statusFilter) {
+function renderList(data, statusFilter, sortField) {
   const result = listTasks(data, statusFilter);
 
   if (result.error) {
@@ -93,7 +133,7 @@ function renderList(data, statusFilter) {
     });
 
     for (const key of sortedKeys) {
-      const tasks = groups.get(key).sort((a, b) => a.id - b.id);
+      const tasks = sortTasks(groups.get(key), sortField);
 
       // Print tag section header
       if (key) {
@@ -105,6 +145,7 @@ function renderList(data, statusFilter) {
       const table = new Table({
         head: [
           chalk.bold("ID"),
+          chalk.bold("Priority"),
           chalk.bold("Status"),
           chalk.bold("Title"),
           chalk.bold("Due"),
@@ -116,6 +157,7 @@ function renderList(data, statusFilter) {
         const isDone = task.status === "done";
         table.push([
           chalk.bold(String(task.id)),
+          priorityCell(task.priority || null),
           isDone ? chalk.green("✓ done") : chalk.yellow("○ todo"),
           isDone ? chalk.dim(task.title) : task.title,
           dueDateCell(task.dueDate),
@@ -160,6 +202,7 @@ ${chalk.bold("Aliases (shortcuts):")}
   tsk del →  tsk delete
   tsk u   →  tsk update
   tsk ud  →  tsk update-due
+  tsk clr →  tsk clear
 `);
 
 // ─── add ──────────────────────────────────────────────────────────────────────
@@ -168,9 +211,10 @@ program
   .alias("a")
   .description("Add a new task")
   .argument("<title>", "The task title")
-  .option("--due <date>", 'Due date, e.g. "march 15", "3/15", "mar 15"')
-  .option("--tag <tag>",  "Tag to categorize the task, e.g. work, school, personal")
-  .option("-y, --yes",    "Skip confirmation prompt")
+  .option("--due <date>",       'Due date, e.g. "march 15", "3/15", "mar 15"')
+  .option("--tag <tag>",        "Tag to categorize the task, e.g. work, school, personal")
+  .option("-p, --priority <level>", "Priority: high, medium, or low")
+  .option("-y, --yes",          "Skip confirmation prompt")
   .action(async (title, options) => {
     const data = loadData();
 
@@ -185,9 +229,11 @@ program
     }
 
     const tag = options.tag ? options.tag.trim().toLowerCase() : null;
+    const priority = options.priority ? options.priority.trim().toLowerCase() : null;
 
     const extras = [];
     if (tag) extras.push(`${tagEmoji(tag)} ${tag}`);
+    if (priority) extras.push(priorityCell(priority));
     if (dueDate) extras.push(`due: ${formatDueDateShort(dueDate)}`);
     const extraStr = extras.length ? chalk.dim(` (${extras.join(" · ")})`) : "";
 
@@ -195,7 +241,7 @@ program
     if (!ok) { console.log(`${logSymbols.info} Cancelled.`); return; }
 
     clearIfTTY();
-    const result = addTask(data, title, { dueDate, tag });
+    const result = addTask(data, title, { dueDate, tag, priority });
     if (result.error) {
       console.error(`${logSymbols.error} ${chalk.red(result.error)}`);
       process.exit(1);
@@ -212,10 +258,15 @@ program
   .alias("l")
   .description("List all tasks, grouped by tag")
   .option("--status <status>", "Filter by status: todo or done")
+  .option("--sort <field>",   "Sort tasks: priority, priority-asc, due, due-desc")
   .action((options) => {
+    if (options.sort && !VALID_SORT_FIELDS.includes(options.sort)) {
+      console.error(`${logSymbols.error} ${chalk.red(`Invalid sort field "${options.sort}". Use: ${VALID_SORT_FIELDS.join(", ")}.`)}`);
+      process.exit(1);
+    }
     clearIfTTY();
     const data = loadData();
-    renderList(data, options.status);
+    renderList(data, options.status, options.sort);
   });
 
 // ─── done ─────────────────────────────────────────────────────────────────────
@@ -373,6 +424,38 @@ program
 
     saveData(data);
     console.log(`${logSymbols.success} Task ${chalk.bold("#" + result.task.id)} due date updated: "${chalk.cyan(result.task.title)}" → ${chalk.cyan(formatDueDateShort(result.task.dueDate))}\n`);
+    renderList(data);
+  });
+
+// ─── clear ────────────────────────────────────────────────────────────────────
+program
+  .command("clear")
+  .alias("clr")
+  .description("Delete ALL tasks and start fresh (undoable with tsk undo)")
+  .option("-y, --yes", "Skip confirmation prompt")
+  .action(async (options) => {
+    const data = loadData();
+
+    if (data.tasks.length === 0) {
+      clearIfTTY();
+      console.log(`${logSymbols.info} No tasks to clear. The task list is already empty.`);
+      return;
+    }
+
+    const ok = options.yes || await confirm(
+      `🗑️  Delete ALL ${chalk.red.bold(data.tasks.length)} task(s)? This cannot be undone without ${chalk.cyan("tsk undo")}.`
+    );
+    if (!ok) { console.log(`${logSymbols.info} Cancelled.`); return; }
+
+    clearIfTTY();
+    const result = clearAll(data);
+    if (result.error) {
+      console.error(`${logSymbols.error} ${chalk.red(result.error)}`);
+      process.exit(1);
+    }
+
+    saveData(data);
+    console.log(`${logSymbols.success} Cleared ${chalk.bold(result.count)} task(s). Task list is now empty.\n`);
     renderList(data);
   });
 

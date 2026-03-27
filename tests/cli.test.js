@@ -231,4 +231,77 @@ describe("CLI integration", () => {
     expect(stdout).not.toContain("Step 2");
     expect(stdout).toContain("Total: 1");
   });
+
+  it("adds a task with priority and shows it in the list", () => {
+    runCli(["add", "Fix bug", "--priority", "high"]);
+    const { stdout } = runCli(["list"]);
+    expect(stdout).toContain("high");
+  });
+
+  it("shows error for invalid priority", () => {
+    const { stderr } = runCli(["add", "Task", "--priority", "urgent"], true);
+    expect(stderr).toContain("Invalid priority");
+  });
+
+  it("tasks without due date show 'none' in the list", () => {
+    runCli(["add", "No due date task"]);
+    const { stdout } = runCli(["list"]);
+    expect(stdout).toContain("none");
+  });
+
+  it("sorts tasks by priority high-first with --sort priority", () => {
+    runCli(["add", "Low task",  "--priority", "low"]);
+    runCli(["add", "High task", "--priority", "high"]);
+    const { stdout } = runCli(["list", "--sort", "priority"]);
+    const highPos = stdout.indexOf("high");
+    const lowPos  = stdout.indexOf("low");
+    expect(highPos).toBeLessThan(lowPos);
+  });
+
+  it("sorts tasks by priority low-first with --sort priority-asc", () => {
+    runCli(["add", "High task", "--priority", "high"]);
+    runCli(["add", "Low task",  "--priority", "low"]);
+    const { stdout } = runCli(["list", "--sort", "priority-asc"]);
+    const highPos = stdout.indexOf("High task");
+    const lowPos  = stdout.indexOf("Low task");
+    expect(lowPos).toBeLessThan(highPos);
+  });
+
+  it("sorts tasks by closest due date with --sort due", () => {
+    runCli(["add", "Far task",   "--due", "december 31"]);
+    runCli(["add", "Close task", "--due", "april 1"]);
+    const { stdout } = runCli(["list", "--sort", "due"]);
+    const closePos = stdout.indexOf("Close task");
+    const farPos   = stdout.indexOf("Far task");
+    expect(closePos).toBeLessThan(farPos);
+  });
+
+  it("shows error for invalid --sort value", () => {
+    const { stderr } = runCli(["list", "--sort", "random"], true);
+    expect(stderr).toContain("Invalid sort field");
+  });
+
+  it("clears all tasks with the clear command", () => {
+    runCli(["add", "Task 1"]);
+    runCli(["add", "Task 2"]);
+    const { stdout } = runCli(["clear"]);
+    expect(stdout).toContain("Cleared 2 task(s)");
+    const { stdout: listOut } = runCli(["list"]);
+    expect(listOut).toContain("No tasks yet");
+  });
+
+  it("shows message when clearing an empty list", () => {
+    const { stdout } = runCli(["clear"]);
+    expect(stdout).toContain("already empty");
+  });
+
+  it("undo after clear restores all tasks", () => {
+    runCli(["add", "Important task"]);
+    runCli(["add", "Another task"]);
+    runCli(["clear"]);
+    runCli(["undo"]);
+    const { stdout } = runCli(["list"]);
+    expect(stdout).toContain("Important task");
+    expect(stdout).toContain("Another task");
+  });
 });

@@ -135,7 +135,7 @@ function parseDueDate(input) {
   };
 }
 
-function addTask(data, title, { dueDate = null, tag = null } = {}) {
+function addTask(data, title, { dueDate = null, tag = null, priority = null } = {}) {
   const validation = validateTitle(title);
   if (!validation.valid) return { error: validation.message };
 
@@ -144,6 +144,14 @@ function addTask(data, title, { dueDate = null, tag = null } = {}) {
     if (!trimmed) return { error: "Tag cannot be empty." };
     if (trimmed.length > 30) return { error: "Tag is too long (max 30 characters)." };
     tag = trimmed;
+  }
+
+  if (priority !== null) {
+    const norm = priority.trim().toLowerCase();
+    if (!["high", "medium", "low"].includes(norm)) {
+      return { error: `Invalid priority "${priority}". Use: high, medium, or low.` };
+    }
+    priority = norm;
   }
 
   saveUndoSnapshot(data);
@@ -155,6 +163,7 @@ function addTask(data, title, { dueDate = null, tag = null } = {}) {
     id: data.tagCounters[tagKey],
     title: title.trim(),
     status: "todo",
+    priority,
     tag,
     dueDate,
     createdAt: now,
@@ -265,6 +274,15 @@ function undoAction(data) {
   return { success: true };
 }
 
+function clearAll(data) {
+  if (data.tasks.length === 0) return { error: "No tasks to clear. The task list is already empty." };
+  const count = data.tasks.length;
+  saveUndoSnapshot(data);
+  data.tasks = [];
+  data.tagCounters = {};
+  return { success: true, count };
+}
+
 module.exports = {
-  addTask, listTasks, markDone, markTodo, deleteTask, updateTask, updateDueDate, undoAction, parseDueDate,
+  addTask, listTasks, markDone, markTodo, deleteTask, updateTask, updateDueDate, undoAction, parseDueDate, clearAll,
 };

@@ -1,4 +1,4 @@
-const { addTask, listTasks, markDone, markTodo, deleteTask, updateTask, updateDueDate, undoAction, parseDueDate } = require("../src/task");
+const { addTask, listTasks, markDone, markTodo, deleteTask, updateTask, updateDueDate, undoAction, parseDueDate, clearAll } = require("../src/task");
 
 let data;
 
@@ -14,12 +14,39 @@ describe("addTask", () => {
     expect(result.task.id).toBe(1);
     expect(result.task.title).toBe("Buy groceries");
     expect(result.task.status).toBe("todo");
+    expect(result.task.priority).toBeNull();
     expect(result.task.tag).toBeNull();
     expect(result.task.dueDate).toBeNull();
     expect(result.task.createdAt).toBeDefined();
     expect(result.task.updatedAt).toBeDefined();
     expect(data.tasks).toHaveLength(1);
     expect(data.tagCounters[""]).toBe(2);
+  });
+
+  it("adds a task with priority high", () => {
+    const result = addTask(data, "Fix bug", { priority: "high" });
+    expect(result.task.priority).toBe("high");
+  });
+
+  it("normalizes priority to lowercase", () => {
+    const result = addTask(data, "Fix bug", { priority: "HIGH" });
+    expect(result.task.priority).toBe("high");
+  });
+
+  it("accepts all valid priority values", () => {
+    expect(addTask(data, "A", { priority: "high" }).task.priority).toBe("high");
+    expect(addTask(data, "B", { priority: "medium" }).task.priority).toBe("medium");
+    expect(addTask(data, "C", { priority: "low" }).task.priority).toBe("low");
+  });
+
+  it("returns error for invalid priority", () => {
+    const result = addTask(data, "Task", { priority: "urgent" });
+    expect(result.error).toContain("Invalid priority");
+  });
+
+  it("defaults priority to null when not specified", () => {
+    const result = addTask(data, "Task");
+    expect(result.task.priority).toBeNull();
   });
 
   it("adds a task with a tag (lowercased)", () => {
@@ -460,5 +487,52 @@ describe("undoAction", () => {
     undoAction(data);
 
     expect(data.tagCounters["work"]).toBeUndefined();
+  });
+});
+
+describe("clearAll", () => {
+  it("clears all tasks and resets tagCounters", () => {
+    addTask(data, "Task A");
+    addTask(data, "Task B", { tag: "work" });
+    expect(data.tasks).toHaveLength(2);
+
+    const result = clearAll(data);
+
+    expect(result.success).toBe(true);
+    expect(result.count).toBe(2);
+    expect(data.tasks).toHaveLength(0);
+    expect(data.tagCounters).toEqual({});
+  });
+
+  it("returns error when no tasks exist", () => {
+    const result = clearAll(data);
+    expect(result.error).toContain("already empty");
+  });
+
+  it("returns the count of cleared tasks", () => {
+    addTask(data, "A");
+    addTask(data, "B");
+    addTask(data, "C");
+    const result = clearAll(data);
+    expect(result.count).toBe(3);
+  });
+
+  it("undo after clearAll restores all tasks and tagCounters", () => {
+    addTask(data, "Keep me", { tag: "work", priority: "high" });
+    addTask(data, "Keep me too");
+    clearAll(data);
+    expect(data.tasks).toHaveLength(0);
+
+    undoAction(data);
+
+    expect(data.tasks).toHaveLength(2);
+    expect(data.tagCounters["work"]).toBe(2);
+    expect(data.tagCounters[""]).toBe(2);
+  });
+
+  it("saves undo snapshot before clearing", () => {
+    addTask(data, "Task");
+    clearAll(data);
+    expect(data.undo).not.toBeNull();
   });
 });

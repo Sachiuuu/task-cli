@@ -180,17 +180,30 @@ tsk del 1 --yes
 tsk clr --yes
 ```
 
-## Tag disambiguation
+## Tag targeting rules
 
-Since each tag has its own ID sequence, the same ID number can exist in multiple tags. When this happens, commands that target a specific task require `--tag`:
+There are two types of tasks: **untagged** (shown in the "Other" table) and **tagged** (shown in their own named table). The targeting rule is simple:
+
+| Task type | How to target it |
+|-----------|-----------------|
+| Untagged (Other) | Use ID alone — `tsk done 1` |
+| Tagged | Always use `--tag` — `tsk done 1 --tag work` |
 
 ```bash
-tsk add "Fix bug"   --tag work    # ID 1 in work
-tsk add "Read book" --tag school  # ID 1 in school
+tsk add "Buy milk"              # untagged — ID 1 in Other
+tsk add "Fix bug" --tag work    # tagged   — ID 1 in work
 
-tsk done 1              # ✖ Error: Multiple tasks with ID 1 — use --tag
-tsk done 1 --tag work   # ✔ Marks "Fix bug" as done
+tsk done 1              # ✔ Marks "Buy milk" (untagged)
+tsk done 1 --tag work   # ✔ Marks "Fix bug" (work)
+tsk delete 1            # ✔ Deletes "Buy milk" (untagged), not "Fix bug"
 ```
+
+If you try to target a tagged task without `--tag`, you get a helpful error:
+```
+✖ Task #1 belongs to a tag ("work"). Use --tag <tag> to target it.
+```
+
+This means `tsk delete 1` will **never** accidentally delete a tagged task.
 
 ## Where is my data stored?
 

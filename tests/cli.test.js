@@ -175,12 +175,20 @@ describe("CLI integration", () => {
     expect(stdout).toContain("Gym task 1");
   });
 
-  it("requires --tag when same ID exists in multiple tags", () => {
+  it("requires --tag when targeting a task that only exists in tagged groups", () => {
     runCli(["add", "Work task", "--tag", "work"]);
     runCli(["add", "Gym task",  "--tag", "gym"]);
-    // Both are ID 1 in their respective tags
+    // Both are ID 1 in their respective tags — no untagged task with ID 1
     const { stderr } = runCli(["done", "1"], true);
-    expect(stderr).toContain("Multiple tasks");
+    expect(stderr).toContain("belongs to a tag");
+  });
+
+  it("targets untagged task by ID when same ID also exists in a tagged group", () => {
+    runCli(["add", "Untagged task"]);          // ID 1, no tag
+    runCli(["add", "Work task", "--tag", "work"]); // ID 1 in work
+    const { stdout } = runCli(["done", "1"]);  // no --tag → targets untagged
+    expect(stdout).toContain("Untagged task");
+    expect(stdout).toContain("marked as done");
   });
 
   it("marks done with --tag when same ID exists in multiple tags", () => {
@@ -212,11 +220,11 @@ describe("CLI integration", () => {
     expect(stderr).toContain("Invalid date");
   });
 
-  it("update-due requires --tag when same ID exists in multiple tags", () => {
+  it("update-due requires --tag when targeting tagged-only tasks", () => {
     runCli(["add", "Work task", "--tag", "work"]);
     runCli(["add", "Gym task",  "--tag", "gym"]);
     const { stderr } = runCli(["update-due", "1", "december 25"], true);
-    expect(stderr).toContain("Multiple tasks");
+    expect(stderr).toContain("belongs to a tag");
   });
 
   it("handles full workflow: add, done, list, delete", () => {

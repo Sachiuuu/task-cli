@@ -194,15 +194,27 @@ program
   .description("A simple CLI task manager for everyday to-do tracking")
   .version("1.0.0")
   .addHelpText("after", `
-${chalk.bold("Aliases (shortcuts):")}
-  tsk a   →  tsk add
-  tsk l   →  tsk list
-  tsk d   →  tsk done
-  tsk td  →  tsk todo
-  tsk del →  tsk delete
-  tsk u   →  tsk update
-  tsk ud  →  tsk update-due
-  tsk clr →  tsk clear
+${chalk.bold("Aliases:")}
+  tsk a   →  add       tsk l   →  list      tsk d   →  done
+  tsk td  →  todo      tsk del →  delete    tsk u   →  update
+  tsk ud  →  update-due            tsk clr →  clear
+
+${chalk.bold("Key options:")}
+  ${chalk.cyan("add")}     ${chalk.dim("--priority high|medium|low")}   Set task priority
+          ${chalk.dim("--due \"march 15\" | \"3/15\"")}    Set due date (year auto-set)
+          ${chalk.dim("--tag <name>")}                 Assign to a tag/group
+  ${chalk.cyan("list")}    ${chalk.dim("--sort priority")}              High priority first per table
+          ${chalk.dim("--sort priority-asc")}          Low priority first per table
+          ${chalk.dim("--sort due")}                   Closest due date first
+          ${chalk.dim("--sort due-desc")}              Furthest due date first
+          ${chalk.dim("--status todo|done")}           Filter by status
+  ${chalk.cyan("update-due <id> <date>")}              Change a task's due date
+  ${chalk.cyan("clear")}                               Delete all tasks (undoable)
+
+${chalk.bold("Tag rules:")}
+  Untagged tasks  →  target by ID alone:   ${chalk.cyan("tsk done 1")}
+  Tagged tasks    →  always use --tag:     ${chalk.cyan("tsk done 1 --tag work")}
+  All of done/todo/delete/update/update-due accept --tag
 `);
 
 // ─── add ──────────────────────────────────────────────────────────────────────

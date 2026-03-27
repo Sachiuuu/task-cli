@@ -220,19 +220,27 @@ describe("markDone", () => {
     expect(result.error).toContain("not a valid task ID");
   });
 
-  it("finds task by tag when ID exists in multiple tags", () => {
+  it("targets tagged task when --tag is specified", () => {
     addTask(data, "Work task", { tag: "work" });
-    // ID 1 now exists in both "" (untagged) and "work"
+    // ID 1 exists in both "" (untagged) and "work"
     const result = markDone(data, 1, "work");
     expect(result.task.tag).toBe("work");
     expect(result.task.status).toBe("done");
   });
 
-  it("returns error when ID is ambiguous across tags without --tag", () => {
+  it("without --tag, targets the untagged task even when same ID exists in tagged group", () => {
     addTask(data, "Work task", { tag: "work" });
-    // ID 1 exists in both "" and "work"
-    const result = markDone(data, 1);
-    expect(result.error).toContain("Multiple tasks");
+    // ID 1 in both "" (untagged, from beforeEach) and "work"
+    const result = markDone(data, 1); // no tag → targets untagged "Test task"
+    expect(result.task.tag).toBeNull();
+    expect(result.task.status).toBe("done");
+  });
+
+  it("returns error when targeting a tagged-only task without --tag", () => {
+    const freshData = { tagCounters: {}, tasks: [], undo: null };
+    addTask(freshData, "Work task", { tag: "work" }); // only tagged task, ID 1
+    const result = markDone(freshData, 1); // no untagged task with ID 1
+    expect(result.error).toContain("belongs to a tag");
   });
 });
 

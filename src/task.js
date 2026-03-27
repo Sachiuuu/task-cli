@@ -33,7 +33,8 @@ function validateTitle(title) {
 }
 
 // Find a task by id, optionally scoped to a tag.
-// tag = undefined/null → search all tasks; multiple matches → error asking for --tag
+// Without --tag: targets UNTAGGED tasks only. Tagged tasks always require --tag.
+// With --tag: targets only tasks in that specific tag group.
 function findTask(data, id, tag) {
   const numId = Number(id);
   if (isNaN(numId) || !Number.isInteger(numId) || numId <= 0) {
@@ -50,15 +51,18 @@ function findTask(data, id, tag) {
     return { task };
   }
 
-  const matches = data.tasks.filter((t) => t.id === numId);
-  if (matches.length === 0) {
-    return { error: `No task found with ID ${numId}. Run 'tsk list' to see your tasks.` };
+  // No tag → target untagged (Other) only
+  const untagged = data.tasks.find((t) => t.id === numId && !t.tag);
+  if (untagged) return { task: untagged };
+
+  // Check if any tagged tasks match, to give a helpful error
+  const tagged = data.tasks.filter((t) => t.id === numId && t.tag);
+  if (tagged.length > 0) {
+    const tagList = tagged.map((t) => `"${t.tag}"`).join(", ");
+    return { error: `Task #${numId} belongs to a tag (${tagList}). Use --tag <tag> to target it (e.g., tsk done ${numId} --tag ${tagged[0].tag}).` };
   }
-  if (matches.length > 1) {
-    const tags = matches.map((t) => t.tag ? `"${t.tag}"` : '"(untagged)"').join(", ");
-    return { error: `Multiple tasks with ID ${numId} exist across tags: ${tags}. Use --tag <tag> to specify which one.` };
-  }
-  return { task: matches[0] };
+
+  return { error: `No task found with ID ${numId}. Run 'tsk list' to see your tasks.` };
 }
 
 function parseDueDate(input) {
